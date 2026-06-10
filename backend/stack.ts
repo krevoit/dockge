@@ -592,7 +592,7 @@ export class Stack {
 
         const cacheKey = this.fullPath;
         const cached = Stack.updateInfoCache.get(cacheKey);
-        const maxAge = 30 * 60 * 1000;
+        const maxAge = 5 * 60 * 1000;
         if (cached && Date.now() - cached.checkedAt < maxAge) {
             this._hasUpdates = cached.hasUpdates;
             this._updateServices = cached.updateServices;
@@ -624,8 +624,7 @@ export class Stack {
         const output = `${stdout}\n${stderr}`;
         const updateLines = output
             .split("\n")
-            .filter(line => /(pull|download|newer image|update|recreate)/i.test(line))
-            .filter(line => !/(already|up to date|skipped|unchanged)/i.test(line));
+            .filter(line => /(downloaded newer image|newer image is available|image is out of date|updates? available)/i.test(line));
         const serviceNames = this.getServiceNames();
         const updateServices = serviceNames.filter(serviceName =>
             updateLines.some(line => line.includes(serviceName))
