@@ -5,6 +5,7 @@ import Setup from "./pages/Setup.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import DashboardHome from "./pages/DashboardHome.vue";
 import Console from "./pages/Console.vue";
+import DockerResources from "./pages/DockerResources.vue";
 import Compose from "./pages/Compose.vue";
 import ContainerTerminal from "./pages/ContainerTerminal.vue";
 import { useToast } from "vue-toastification";
@@ -64,6 +65,10 @@ const routes = [
                     {
                         path: "/console/:endpoint",
                         component: Console,
+                    },
+                    {
+                        path: "/resources",
+                        component: DockerResources,
                     },
                     {
                         path: "/settings",
