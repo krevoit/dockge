@@ -21,6 +21,10 @@
                             <font-awesome-icon icon="terminal" />
                             Bash
                         </router-link>
+                        <router-link v-if="!isEditMode" class="btn btn-normal" :to="logsRouteLink">
+                            <font-awesome-icon icon="stream" />
+                            {{ $t("logs") }}
+                        </router-link>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
                             class="btn btn-primary"
@@ -279,6 +283,29 @@ export default defineComponent({
                         stackName: this.stackName,
                         serviceName: this.name,
                         type: "bash",
+                    },
+                };
+            }
+        },
+
+        logsRouteLink() {
+            if (this.endpoint) {
+                return {
+                    name: "containerTerminalEndpoint",
+                    params: {
+                        endpoint: this.endpoint,
+                        stackName: this.stackName,
+                        serviceName: this.name,
+                        type: "logs",
+                    },
+                };
+            } else {
+                return {
+                    name: "containerTerminal",
+                    params: {
+                        stackName: this.stackName,
+                        serviceName: this.name,
+                        type: "logs",
                     },
                 };
             }

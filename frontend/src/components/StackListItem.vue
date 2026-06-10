@@ -3,6 +3,9 @@
         <Uptime :stack="stack" :fixed-width="true" class="me-2" />
         <div class="title">
             <span>{{ stackName }}</span>
+            <span v-if="stack.hasUpdates" class="update-indicator" :title="updateTitle">
+                <font-awesome-icon icon="cloud-arrow-down" />
+            </span>
             <div v-if="$root.agentCount > 1" class="endpoint">{{ endpointDisplay }}</div>
         </div>
     </router-link>
@@ -10,10 +13,12 @@
 
 <script>
 import Uptime from "./Uptime.vue";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 export default {
     components: {
-        Uptime
+        Uptime,
+        FontAwesomeIcon
     },
     props: {
         /** Stack this represents */
@@ -70,6 +75,12 @@ export default {
         },
         stackName() {
             return this.stack.name;
+        },
+        updateTitle() {
+            if (this.stack.updateServices?.length > 0) {
+                return `${this.$t("updateAvailable")}: ${this.stack.updateServices.join(", ")}`;
+            }
+            return this.$t("updateAvailable");
         }
     },
     watch: {
@@ -149,6 +160,12 @@ export default {
     }
     .title {
         margin-top: -4px;
+    }
+    .update-indicator {
+        color: #0d6efd;
+        font-size: 13px;
+        margin-left: 6px;
+        vertical-align: 1px;
     }
     .endpoint {
         font-size: 12px;

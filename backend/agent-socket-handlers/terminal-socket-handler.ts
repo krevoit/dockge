@@ -115,6 +115,33 @@ export class TerminalSocketHandler extends AgentSocketHandler {
             }
         });
 
+        // Follow logs for a single compose service/container
+        agentSocket.on("containerLogsTerminal", async (stackName : unknown, serviceName : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof(stackName) !== "string") {
+                    throw new ValidationError("Stack name must be a string.");
+                }
+
+                if (typeof(serviceName) !== "string") {
+                    throw new ValidationError("Service name must be a string.");
+                }
+
+                log.debug("containerLogsTerminal", "Stack name: " + stackName);
+                log.debug("containerLogsTerminal", "Service name: " + serviceName);
+
+                const stack = await Stack.getStack(server, stackName);
+                stack.joinContainerLogsTerminal(socket, serviceName);
+
+                callbackResult({
+                    ok: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         // Join Output Terminal
         agentSocket.on("terminalJoin", async (terminalName : unknown, callback) => {
             if (typeof(callback) !== "function") {

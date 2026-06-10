@@ -60,6 +60,7 @@ export default {
         // displayOnly: Only display terminal output
         // mainTerminal: Allow input limited commands and output
         // interactive: Free input and output
+        // containerLogs: Follow logs for a single compose service
         mode: {
             type: String,
             default: "displayOnly",
@@ -101,8 +102,8 @@ export default {
         this.terminal.open(this.$refs.terminal);
         this.terminal.focus();
 
-        // Add right-click context menu handler for paste
-        this.$refs.terminal.addEventListener("contextmenu", this.handleContextMenu);
+        this.$refs.terminal.addEventListener("copy", this.handleClipboardCopy);
+        this.$refs.terminal.addEventListener("paste", this.handleClipboardPaste);
 
         // Add selection handler for copy to clipboard
         this.terminal.onSelectionChange(() => {
@@ -134,6 +135,13 @@ export default {
                     this.$root.toastRes(res);
                 }
             });
+        } else if (this.mode === "containerLogs") {
+            console.debug("Create container logs terminal:", this.name);
+            this.$root.emitAgent(this.endpoint, "containerLogsTerminal", this.stackName, this.serviceName, (res) => {
+                if (!res.ok) {
+                    this.$root.toastRes(res);
+                }
+            });
         }
         // Fit the terminal width to the div container size after terminal is created.
         this.updateTerminalSize();
@@ -142,7 +150,8 @@ export default {
     unmounted() {
         window.removeEventListener("resize", this.onResizeEvent);
         if (this.$refs?.terminal) {
-            this.$refs.terminal.removeEventListener("contextmenu", this.handleContextMenu);
+            this.$refs.terminal.removeEventListener("copy", this.handleClipboardCopy);
+            this.$refs.terminal.removeEventListener("paste", this.handleClipboardPaste);
         }
         this.$root.unbindTerminal(this.name);
         this.terminal.dispose();
@@ -237,7 +246,7 @@ export default {
                     console.debug("Ctrl + C");
                     this.$root.emitAgent(this.endpoint, "terminalInput", this.name, e.key);
                     this.removeInput();
-                } else if (e.key === "\u0016" || (e.ctrlKey && e.key === "v")) { // Ctrl + V (paste)
+                } else if (e.key === "\u0016" || ((e.domEvent?.ctrlKey || e.domEvent?.metaKey) && e.domEvent?.key?.toLowerCase() === "v")) { // Paste
                     this.handlePaste();
                 } else if (e.key === "\u0009" || e.key.startsWith("\u001B")) {   // TAB or other special keys
                     // Do nothing
@@ -255,7 +264,7 @@ export default {
         interactiveTerminalConfig() {
             this.terminal.onKey(e => {
                 // Handle Ctrl+V for paste
-                if (e.key === "\u0016" || (e.ctrlKey && e.key === "v")) {
+                if (e.key === "\u0016" || ((e.domEvent?.ctrlKey || e.domEvent?.metaKey) && e.domEvent?.key?.toLowerCase() === "v")) {
                     this.handlePaste();
                     return;
                 }
@@ -297,6 +306,9 @@ export default {
          */
         async handlePaste() {
             try {
+                if (!navigator.clipboard?.readText) {
+                    return;
+                }
                 const text = await navigator.clipboard.readText();
                 if (text) {
                     this.pasteText(text);
@@ -304,6 +316,36 @@ export default {
             } catch (error) {
                 console.error("Failed to read from clipboard:", error);
             }
+        },
+
+        /**
+         * Handle native browser paste events from keyboard shortcuts and context menus.
+         */
+        handleClipboardPaste(event) {
+            if (this.mode !== "mainTerminal" && this.mode !== "interactive") {
+                return;
+            }
+
+            const text = event.clipboardData?.getData("text/plain");
+            if (!text) {
+                return;
+            }
+
+            event.preventDefault();
+            this.pasteText(text);
+        },
+
+        /**
+         * Handle native browser copy events for selected terminal text.
+         */
+        handleClipboardCopy(event) {
+            const selectedText = this.terminal.getSelection();
+            if (!selectedText || !event.clipboardData) {
+                return;
+            }
+
+            event.clipboardData.setData("text/plain", selectedText);
+            event.preventDefault();
         },
 
         /**
@@ -334,19 +376,6 @@ export default {
                         this.$root.toastRes(res);
                     }
                 });
-            }
-        },
-
-        /**
-         * Handle right-click context menu for paste operation
-         */
-        handleContextMenu(event) {
-            // Prevent default context menu
-            event.preventDefault();
-
-            // Only handle paste for modes that support input
-            if (this.mode === "mainTerminal" || this.mode === "interactive") {
-                this.handlePaste();
             }
         },
 

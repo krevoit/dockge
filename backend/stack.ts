@@ -12,7 +12,7 @@ import {
     CREATED_FILE,
     CREATED_STACK,
     EXITED, getCombinedTerminalName,
-    getComposeTerminalName, getContainerExecTerminalName,
+    getComposeTerminalName, getContainerExecTerminalName, getContainerLogsTerminalName,
     PROGRESS_TERMINAL_ROWS,
     RUNNING, TERMINAL_ROWS,
     UNKNOWN
@@ -56,10 +56,13 @@ export class Stack {
     protected _composeFileName: string = "compose.yaml";
     protected _composeOverrideFileName: string = "compose.override.yaml";
     protected server: DockgeServer;
+    protected _hasUpdates: boolean = false;
+    protected _updateServices: string[] = [];
 
     protected combinedTerminal? : Terminal;
 
     protected static managedStackList: Map<string, Stack> = new Map();
+    protected static updateInfoCache: Map<string, { checkedAt: number, hasUpdates: boolean, updateServices: string[] }> = new Map();
 
     constructor(server : DockgeServer, name : string, composeYAML? : string, composeENV? : string, composeOverrideYAML? : string, skipFSOperations = false) {
         this.name = name;
@@ -123,6 +126,8 @@ export class Stack {
             isManagedByDockge: this.isManagedByDockge,
             composeFileName: this._composeFileName,
             composeOverrideFileName: this._composeOverrideFileName,
+            hasUpdates: this._hasUpdates,
+            updateServices: this._updateServices,
             endpoint,
         };
     }
@@ -279,6 +284,7 @@ export class Stack {
         if (exitCode !== 0) {
             throw new Error("Failed to deploy, please check the terminal output for more information.");
         }
+        Stack.updateInfoCache.delete(this.fullPath);
         return exitCode;
     }
 
@@ -409,6 +415,8 @@ export class Stack {
             stack._status = await this.statusConvert(composeStack);
             stack._configFilePath = composeStack.ConfigFiles;
         }
+
+        await Promise.all(Array.from(stackList.values()).map(stack => stack.refreshUpdateInfo()));
 
         return stackList;
     }
@@ -562,6 +570,77 @@ export class Stack {
         return options;
     }
 
+    protected getServiceNames() : string[] {
+        try {
+            const doc = yaml.parse(this.composeYAML);
+            if (!doc?.services || typeof doc.services !== "object") {
+                return [];
+            }
+            return Object.keys(doc.services);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    protected async refreshUpdateInfo() {
+        this._hasUpdates = false;
+        this._updateServices = [];
+
+        if (!this.isManagedByDockge || this.status !== RUNNING) {
+            return;
+        }
+
+        const cacheKey = this.fullPath;
+        const cached = Stack.updateInfoCache.get(cacheKey);
+        const maxAge = 30 * 60 * 1000;
+        if (cached && Date.now() - cached.checkedAt < maxAge) {
+            this._hasUpdates = cached.hasUpdates;
+            this._updateServices = cached.updateServices;
+            return;
+        }
+
+        let stdout = "";
+        let stderr = "";
+        try {
+            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("pull", "--dry-run"), {
+                cwd: this.path,
+                encoding: "utf-8",
+                timeout: 30 * 1000,
+            });
+            stdout = res.stdout?.toString() || "";
+            stderr = res.stderr?.toString() || "";
+        } catch (e) {
+            if (e instanceof Error) {
+                log.debug("refreshUpdateInfo", `Unable to check ${this.name}: ${e.message}`);
+            }
+            Stack.updateInfoCache.set(cacheKey, {
+                checkedAt: Date.now(),
+                hasUpdates: false,
+                updateServices: [],
+            });
+            return;
+        }
+
+        const output = `${stdout}\n${stderr}`;
+        const updateLines = output
+            .split("\n")
+            .filter(line => /(pull|download|newer image|update|recreate)/i.test(line))
+            .filter(line => !/(already|up to date|skipped|unchanged)/i.test(line));
+        const serviceNames = this.getServiceNames();
+        const updateServices = serviceNames.filter(serviceName =>
+            updateLines.some(line => line.includes(serviceName))
+        );
+        const hasUpdates = updateLines.length > 0;
+
+        this._hasUpdates = hasUpdates;
+        this._updateServices = updateServices;
+        Stack.updateInfoCache.set(cacheKey, {
+            checkedAt: Date.now(),
+            hasUpdates,
+            updateServices,
+        });
+    }
+
     async start(socket: DockgeSocket) {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("up", "-d", "--remove-orphans"), this.path);
@@ -604,6 +683,7 @@ export class Stack {
         if (exitCode !== 0) {
             throw new Error("Failed to pull, please check the terminal output for more information.");
         }
+        Stack.updateInfoCache.delete(this.fullPath);
 
         // If the stack is not running, we don't need to restart it
         await this.updateStatus();
@@ -653,6 +733,15 @@ export class Stack {
             log.debug("joinContainerTerminal", "Terminal created");
         }
 
+        terminal.join(socket);
+        terminal.start();
+    }
+
+    async joinContainerLogsTerminal(socket: DockgeSocket, serviceName: string) {
+        const terminalName = getContainerLogsTerminalName(socket.endpoint, this.name, serviceName);
+        const terminal = Terminal.getOrCreateTerminal(this.server, terminalName, "docker", this.getComposeOptions("logs", "-f", "--tail", "100", serviceName), this.path);
+        terminal.enableKeepAlive = true;
+        terminal.rows = TERMINAL_ROWS;
         terminal.join(socket);
         terminal.start();
     }
