@@ -356,10 +356,13 @@ export class DockerSocketHandler extends AgentSocketHandler {
         agentSocket.on("dockerResources", async (callback) => {
             try {
                 checkLogin(socket);
-                const [ containers, networks, volumes ] = await Promise.all([
-                    this.getDockerContainers(),
-                    this.getDockerNetworks(),
-                    this.getDockerVolumes(),
+                const allContainers = await this.getDockerContainers();
+                const dockgeContainers = allContainers.filter(container => container.isDockge);
+                const containers = allContainers.filter(container => !container.isDockge);
+                const [ networks, volumes, images ] = await Promise.all([
+                    this.getDockerNetworks(dockgeContainers),
+                    this.getDockerVolumes(dockgeContainers, containers),
+                    this.getDockerImages(dockgeContainers, containers),
                 ]);
                 callbackResult({
                     ok: true,
@@ -367,6 +370,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                         containers,
                         networks,
                         volumes,
+                        images,
                     },
                 }, callback);
             } catch (e) {
@@ -386,6 +390,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                     container: [ "rm", "-f", name ],
                     network: [ "network", "rm", name ],
                     volume: [ "volume", "rm", name ],
+                    image: [ "image", "rm", name ],
                 };
                 const args = commands[resourceType];
                 if (!args) {
@@ -437,6 +442,18 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 if (data.parent) {
                     args.push("--opt", `parent=${data.parent}`);
                 }
+                const optionRows = data.options instanceof Array ? data.options : [];
+                for (const optionRow of optionRows) {
+                    if (!optionRow || typeof(optionRow) !== "object") {
+                        continue;
+                    }
+                    const option = optionRow as Record<string, unknown>;
+                    const key = String(option.key || "").trim();
+                    const value = String(option.value || "").trim();
+                    if (key && value) {
+                        args.push("--opt", `${key}=${value}`);
+                    }
+                }
                 args.push(name);
 
                 await childProcessAsync.spawn("docker", args, {
@@ -454,6 +471,34 @@ export class DockerSocketHandler extends AgentSocketHandler {
         });
     }
 
+    isDockgeLabels(labels : unknown) : boolean {
+        if (!labels || typeof(labels) !== "object") {
+            return false;
+        }
+
+        const labelMap = labels as Record<string, unknown>;
+        return labelMap["com.docker.compose.project"] === "dockge" ||
+            labelMap["com.docker.compose.service"] === "dockge" ||
+            labelMap["com.docker.compose.project.working_dir"]?.toString().includes("/dockge") === true;
+    }
+
+    isDockgeImageName(imageName : unknown) : boolean {
+        const name = String(imageName || "").toLowerCase();
+        return name === "dockge" ||
+            name.endsWith("/dockge") ||
+            name.includes("/dockge:") ||
+            name.includes("/dockge@") ||
+            name.includes("cmcooper1980/dockge") ||
+            name.includes("louislam/dockge");
+    }
+
+    isDockgeContainer(container : Record<string, unknown>, labels : unknown) : boolean {
+        const name = String(container.Names || "").replace(/^\//, "").toLowerCase();
+        return name === "dockge" ||
+            this.isDockgeLabels(labels) ||
+            this.isDockgeImageName(container.Image);
+    }
+
     parseDockerJSONLines(stdout : unknown) : Array<Record<string, unknown>> {
         if (!stdout) {
             return [];
@@ -464,7 +509,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
             .map(line => JSON.parse(line));
     }
 
-    async getDockerContainers() : Promise<Array<object>> {
+    async getDockerContainers() : Promise<Array<Record<string, unknown>>> {
         const res = await childProcessAsync.spawn("docker", [ "ps", "-a", "--format", "json" ], {
             encoding: "utf-8",
         });
@@ -494,6 +539,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
             return {
                 id: container.ID,
                 name: containerName,
+                imageId: inspect.Image,
                 image: container.Image,
                 status: container.Status,
                 state: container.State,
@@ -503,17 +549,19 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 networks,
                 mounts,
                 isolated: hostConfig?.NetworkMode === "none" || networks.length === 0,
+                isDockge: this.isDockgeContainer(container, config?.Labels),
             };
         }));
     }
 
-    async getDockerNetworks() : Promise<Array<object>> {
+    async getDockerNetworks(dockgeContainers : Array<Record<string, unknown>>) : Promise<Array<Record<string, unknown>>> {
         const res = await childProcessAsync.spawn("docker", [ "network", "ls", "--format", "json" ], {
             encoding: "utf-8",
         });
         const networks = this.parseDockerJSONLines(res.stdout);
+        const dockgeContainerIds = dockgeContainers.map(container => String(container.id || ""));
 
-        return Promise.all(networks.map(async (network) => {
+        const result = await Promise.all(networks.map(async (network) => {
             const networkName = String(network.Name || network.ID || "");
             let inspect : DockerInspectObject = {};
             try {
@@ -524,6 +572,12 @@ export class DockerSocketHandler extends AgentSocketHandler {
             } catch (e) {
             }
 
+            const connectedContainers = Object.keys((inspect.Containers as object | undefined) || {});
+            const hasDockgeContainer = connectedContainers.some(containerId => dockgeContainerIds.some(dockgeId => dockgeId.startsWith(containerId) || containerId.startsWith(dockgeId)));
+            const hidden = this.isDockgeLabels(inspect.Labels) ||
+                networkName === "dockge_default" ||
+                (hasDockgeContainer && connectedContainers.length === 1);
+
             return {
                 id: network.ID,
                 name: networkName,
@@ -533,21 +587,27 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 attachable: !!inspect.Attachable,
                 ingress: !!inspect.Ingress,
                 isolated: !!inspect.Internal,
+                unused: connectedContainers.length === 0,
                 options: inspect.Options || {},
                 labels: inspect.Labels || {},
                 ipam: (inspect.IPAM as DockerInspectObject | undefined)?.Config || [],
-                containers: Object.keys((inspect.Containers as object | undefined) || {}),
+                containers: connectedContainers,
+                hidden,
             };
         }));
+
+        return result.filter(network => !network.hidden);
     }
 
-    async getDockerVolumes() : Promise<Array<object>> {
+    async getDockerVolumes(dockgeContainers : Array<Record<string, unknown>>, containers : Array<Record<string, unknown>>) : Promise<Array<Record<string, unknown>>> {
         const res = await childProcessAsync.spawn("docker", [ "volume", "ls", "--format", "json" ], {
             encoding: "utf-8",
         });
         const volumes = this.parseDockerJSONLines(res.stdout);
+        const visibleMounts = containers.flatMap(container => container.mounts as Array<Record<string, unknown>> || []);
+        const dockgeMounts = dockgeContainers.flatMap(container => container.mounts as Array<Record<string, unknown>> || []);
 
-        return Promise.all(volumes.map(async (volume) => {
+        const result = await Promise.all(volumes.map(async (volume) => {
             const volumeName = String(volume.Name || "");
             let inspect : DockerInspectObject = {};
             try {
@@ -558,6 +618,12 @@ export class DockerSocketHandler extends AgentSocketHandler {
             } catch (e) {
             }
 
+            const usedBy = visibleMounts
+                .filter(mount => mount.type === "volume" && mount.name === volumeName)
+                .map(mount => mount.destination);
+            const hidden = this.isDockgeLabels(inspect.Labels) ||
+                dockgeMounts.some(mount => mount.type === "volume" && mount.name === volumeName);
+
             return {
                 name: volumeName,
                 driver: volume.Driver,
@@ -566,8 +632,58 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 createdAt: inspect.CreatedAt || "",
                 labels: inspect.Labels || {},
                 options: inspect.Options || {},
+                usedBy,
+                unused: usedBy.length === 0,
+                hidden,
             };
         }));
+
+        return result.filter(volume => !volume.hidden);
+    }
+
+    async getDockerImages(dockgeContainers : Array<Record<string, unknown>>, containers : Array<Record<string, unknown>>) : Promise<Array<Record<string, unknown>>> {
+        const res = await childProcessAsync.spawn("docker", [ "image", "ls", "--format", "json" ], {
+            encoding: "utf-8",
+        });
+        const images = this.parseDockerJSONLines(res.stdout);
+        const visibleImageIds = containers.map(container => String(container.imageId || container.image || ""));
+        const dockgeImageIds = dockgeContainers.map(container => String(container.imageId || container.image || ""));
+
+        const result = await Promise.all(images.map(async (image) => {
+            const repository = String(image.Repository || "");
+            const tag = String(image.Tag || "");
+            const imageId = String(image.ID || "");
+            const imageName = repository === "<none>" ? imageId : `${repository}:${tag}`;
+            let inspect : DockerInspectObject = {};
+            try {
+                const inspectRes = await childProcessAsync.spawn("docker", [ "image", "inspect", imageName ], {
+                    encoding: "utf-8",
+                });
+                inspect = JSON.parse(inspectRes.stdout?.toString() || "[]")[0] || {};
+            } catch (e) {
+            }
+
+            const fullImageId = String(inspect.Id || imageId);
+            const usedBy = visibleImageIds.filter(usedImageId => fullImageId.includes(usedImageId) || usedImageId.includes(fullImageId) || usedImageId === imageName);
+            const hidden = this.isDockgeLabels((inspect.Config as DockerInspectObject | undefined)?.Labels) ||
+                this.isDockgeImageName(repository) ||
+                dockgeImageIds.some(dockgeImageId => fullImageId.includes(dockgeImageId) || dockgeImageId.includes(fullImageId));
+
+            return {
+                id: imageId,
+                name: imageName,
+                repository,
+                tag,
+                size: image.Size,
+                createdAt: image.CreatedAt,
+                usedBy,
+                unused: usedBy.length === 0,
+                dangling: repository === "<none>" || tag === "<none>",
+                hidden,
+            };
+        }));
+
+        return result.filter(image => !image.hidden);
     }
 
     async saveStack(server : DockgeServer, name : unknown, composeYAML : unknown, composeENV : unknown, composeOverrideYAML : unknown, isAdd : unknown) : Promise<Stack> {

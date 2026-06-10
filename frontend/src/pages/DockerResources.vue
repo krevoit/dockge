@@ -22,6 +22,10 @@
                     {{ $tc("volume", 2) }}
                     <span class="badge bg-secondary ms-1">{{ volumes.length }}</span>
                 </button>
+                <button class="btn" :class="activeTab === 'images' ? 'btn-primary' : 'btn-normal'" @click="activeTab = 'images'">
+                    {{ $tc("image", 2) }}
+                    <span class="badge bg-secondary ms-1">{{ images.length }}</span>
+                </button>
             </div>
 
             <div v-if="loading" class="shadow-box big-padding">{{ $t("loading") }}</div>
@@ -74,6 +78,22 @@
                             </label>
                         </div>
                     </div>
+                    <div class="driver-options mt-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="mb-0">{{ $t("driverOptions") }}</h5>
+                            <button class="btn btn-sm btn-normal" @click="addNetworkOption">
+                                <font-awesome-icon icon="plus" class="me-1" />
+                                {{ $t("addOption") }}
+                            </button>
+                        </div>
+                        <div v-for="(option, index) in newNetwork.options" :key="index" class="option-row">
+                            <input v-model="option.key" class="form-control" :placeholder="$t('key')" />
+                            <input v-model="option.value" class="form-control" :placeholder="$t('value')" />
+                            <button class="btn btn-sm btn-danger" @click="removeNetworkOption(index)">
+                                <font-awesome-icon icon="trash" />
+                            </button>
+                        </div>
+                    </div>
                     <button class="btn btn-primary mt-3" :disabled="creatingNetwork || !newNetwork.name" @click="createNetwork">
                         <font-awesome-icon icon="plus" class="me-1" />
                         {{ $t("createNetwork") }}
@@ -86,6 +106,7 @@
                             <div class="resource-title">
                                 {{ network.name }}
                                 <span v-if="network.isolated" class="badge bg-warning text-dark ms-2">{{ $t("isolated") }}</span>
+                                <span v-if="network.unused" class="badge bg-secondary ms-1">{{ $t("unused") }}</span>
                                 <span v-if="network.internal" class="badge bg-info text-dark ms-1">{{ $t("internal") }}</span>
                                 <span v-if="network.attachable" class="badge bg-secondary ms-1">{{ $t("attachable") }}</span>
                             </div>
@@ -105,11 +126,14 @@
                 </div>
             </div>
 
-            <div v-else class="resource-list">
+            <div v-else-if="activeTab === 'volumes'" class="resource-list">
                 <div v-for="volume in volumes" :key="volume.name" class="shadow-box big-padding resource-row">
                     <div class="resource-main">
                         <div>
-                            <div class="resource-title">{{ volume.name }}</div>
+                            <div class="resource-title">
+                                {{ volume.name }}
+                                <span v-if="volume.unused" class="badge bg-secondary ms-2">{{ $t("unused") }}</span>
+                            </div>
                             <div class="resource-subtitle">{{ volume.driver }} / {{ volume.scope }}</div>
                         </div>
                         <button class="btn btn-sm btn-danger" @click="deleteResource('volume', volume.name)">
@@ -121,6 +145,32 @@
                         <div><strong>{{ $t("scope") }}</strong><span>{{ volume.scope }}</span></div>
                         <div><strong>{{ $t("mountpoint") }}</strong><span>{{ volume.mountpoint }}</span></div>
                         <div><strong>{{ $t("options") }}</strong><span>{{ formatObject(volume.options) }}</span></div>
+                        <div><strong>{{ $t("usedBy") }}</strong><span>{{ formatList(volume.usedBy) }}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="!loading && activeTab === 'images'" class="resource-list">
+                <div v-for="image in images" :key="image.id + image.name" class="shadow-box big-padding resource-row">
+                    <div class="resource-main">
+                        <div>
+                            <div class="resource-title">
+                                {{ image.name }}
+                                <span v-if="image.unused" class="badge bg-secondary ms-2">{{ $t("unused") }}</span>
+                                <span v-if="image.dangling" class="badge bg-warning text-dark ms-1">{{ $t("dangling") }}</span>
+                            </div>
+                            <div class="resource-subtitle">{{ image.id }}</div>
+                        </div>
+                        <button class="btn btn-sm btn-danger" @click="deleteResource('image', image.name)">
+                            <font-awesome-icon icon="trash" />
+                        </button>
+                    </div>
+                    <div class="resource-grid">
+                        <div><strong>{{ $t("repository") }}</strong><span>{{ image.repository }}</span></div>
+                        <div><strong>{{ $t("tag") }}</strong><span>{{ image.tag }}</span></div>
+                        <div><strong>{{ $t("size") }}</strong><span>{{ image.size }}</span></div>
+                        <div><strong>{{ $t("createdAt") }}</strong><span>{{ image.createdAt }}</span></div>
+                        <div><strong>{{ $t("usedBy") }}</strong><span>{{ image.usedBy.length }}</span></div>
                     </div>
                 </div>
             </div>
@@ -137,6 +187,7 @@ export default {
             containers: [],
             networks: [],
             volumes: [],
+            images: [],
             creatingNetwork: false,
             newNetwork: {
                 name: "",
@@ -146,6 +197,7 @@ export default {
                 subnet: "",
                 gateway: "",
                 parent: "",
+                options: [],
             },
         };
     },
@@ -164,6 +216,7 @@ export default {
                 this.containers = res.resources.containers;
                 this.networks = res.resources.networks;
                 this.volumes = res.resources.volumes;
+                this.images = res.resources.images || [];
             });
         },
         deleteResource(type, name) {
@@ -184,6 +237,12 @@ export default {
                 subnet: this.newNetwork.subnet.trim(),
                 gateway: this.newNetwork.gateway.trim(),
                 parent: this.newNetwork.parent.trim(),
+                options: this.newNetwork.options
+                    .map(option => ({
+                        key: option.key.trim(),
+                        value: option.value.trim(),
+                    }))
+                    .filter(option => option.key && option.value),
             };
             this.$root.emitAgent("", "createDockerNetwork", payload, (res) => {
                 this.creatingNetwork = false;
@@ -197,10 +256,20 @@ export default {
                         subnet: "",
                         gateway: "",
                         parent: "",
+                        options: [],
                     };
                     this.loadResources();
                 }
             });
+        },
+        addNetworkOption() {
+            this.newNetwork.options.push({
+                key: "",
+                value: "",
+            });
+        },
+        removeNetworkOption(index) {
+            this.newNetwork.options.splice(index, 1);
         },
         formatList(list) {
             if (!list || list.length === 0) {
@@ -301,5 +370,24 @@ export default {
     align-items: center;
     gap: 16px;
     min-height: 38px;
+}
+
+.driver-options {
+    h5 {
+        font-size: 0.95rem;
+    }
+}
+
+.option-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) minmax(160px, 2fr) auto;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+    .option-row {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
