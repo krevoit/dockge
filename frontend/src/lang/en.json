@@ -44,6 +44,8 @@
     "value": "Value",
     "mountpoint": "Mountpoint",
     "usedBy": "Used By",
+    "networkMembers": "Network Members",
+    "selectContainer": "Select Container",
     "repository": "Repository",
     "tag": "Tag",
     "size": "Size",

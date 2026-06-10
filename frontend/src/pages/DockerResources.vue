@@ -112,7 +112,7 @@
                             </div>
                             <div class="resource-subtitle">{{ network.driver }} / {{ network.scope }}</div>
                         </div>
-                        <button class="btn btn-sm btn-danger" :disabled="isBuiltInNetwork(network.name)" @click="deleteResource('network', network.name)">
+                        <button v-if="!isBuiltInNetwork(network.name)" class="btn btn-sm btn-danger" @click="deleteResource('network', network.name)">
                             <font-awesome-icon icon="trash" />
                         </button>
                     </div>
@@ -122,6 +122,34 @@
                         <div><strong>IPAM</strong><span>{{ formatIPAM(network.ipam) }}</span></div>
                         <div><strong>{{ $t("options") }}</strong><span>{{ formatObject(network.options) }}</span></div>
                         <div><strong>{{ $tc("container", 2) }}</strong><span>{{ network.containers.length }}</span></div>
+                    </div>
+                    <div v-if="canManageNetwork(network.name)" class="network-members mt-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="mb-0">{{ $t("networkMembers") }}</h5>
+                            <div class="network-connect">
+                                <select v-model="selectedNetworkContainers[network.name]" class="form-select form-select-sm">
+                                    <option value="">{{ $t("selectContainer") }}</option>
+                                    <option v-for="container in availableContainersForNetwork(network)" :key="container.id" :value="container.name">
+                                        {{ container.name }}
+                                    </option>
+                                </select>
+                                <button class="btn btn-sm btn-primary" :disabled="!selectedNetworkContainers[network.name]" @click="connectNetwork(network.name)">
+                                    <font-awesome-icon icon="link" />
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="network.containers.length === 0" class="resource-subtitle">{{ $t("notAvailableShort") }}</div>
+                        <div v-else class="member-list">
+                            <div v-for="container in network.containers" :key="container.id" class="member-row">
+                                <div>
+                                    <strong>{{ container.name }}</strong>
+                                    <span>{{ container.ipv4 || container.ipv6 || $t("notAvailableShort") }}</span>
+                                </div>
+                                <button class="btn btn-sm btn-normal" @click="disconnectNetwork(network.name, container.name)">
+                                    <font-awesome-icon icon="unlink" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -188,6 +216,7 @@ export default {
             networks: [],
             volumes: [],
             images: [],
+            selectedNetworkContainers: {},
             creatingNetwork: false,
             newNetwork: {
                 name: "",
@@ -298,6 +327,34 @@ export default {
         isBuiltInNetwork(name) {
             return [ "bridge", "host", "none" ].includes(name);
         },
+        canManageNetwork(name) {
+            return ![ "host", "none" ].includes(name);
+        },
+        availableContainersForNetwork(network) {
+            const attached = new Set(network.containers.map(container => container.name));
+            return this.containers.filter(container => !attached.has(container.name));
+        },
+        connectNetwork(networkName) {
+            const containerName = this.selectedNetworkContainers[networkName];
+            if (!containerName) {
+                return;
+            }
+            this.$root.emitAgent("", "connectDockerNetwork", networkName, containerName, (res) => {
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.selectedNetworkContainers[networkName] = "";
+                    this.loadResources();
+                }
+            });
+        },
+        disconnectNetwork(networkName, containerName) {
+            this.$root.emitAgent("", "disconnectDockerNetwork", networkName, containerName, (res) => {
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.loadResources();
+                }
+            });
+        },
     },
 };
 </script>
@@ -385,8 +442,47 @@ export default {
     margin-top: 8px;
 }
 
+.network-members {
+    border-top: 1px solid rgba(128, 128, 128, 0.18);
+    padding-top: 12px;
+}
+
+.network-connect {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) auto;
+    gap: 8px;
+}
+
+.member-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px;
+}
+
+.member-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid rgba(128, 128, 128, 0.18);
+    border-radius: 8px;
+    padding: 8px 10px;
+
+    strong,
+    span {
+        display: block;
+        word-break: break-word;
+    }
+
+    span {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+}
+
 @media (max-width: 640px) {
-    .option-row {
+    .option-row,
+    .network-connect {
         grid-template-columns: 1fr;
     }
 }

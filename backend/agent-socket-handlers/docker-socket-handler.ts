@@ -469,6 +469,52 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 callbackError(e, callback);
             }
         });
+
+        agentSocket.on("connectDockerNetwork", async (networkName : unknown, containerName : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof(networkName) !== "string" || typeof(containerName) !== "string") {
+                    throw new ValidationError("Network and container names must be strings");
+                }
+
+                await this.checkNotDockgeContainer(containerName);
+                await childProcessAsync.spawn("docker", [ "network", "connect", networkName, containerName ], {
+                    encoding: "utf-8",
+                });
+
+                callbackResult({
+                    ok: true,
+                    msg: "Updated",
+                    msgi18n: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("disconnectDockerNetwork", async (networkName : unknown, containerName : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof(networkName) !== "string" || typeof(containerName) !== "string") {
+                    throw new ValidationError("Network and container names must be strings");
+                }
+
+                await this.checkNotDockgeContainer(containerName);
+                await childProcessAsync.spawn("docker", [ "network", "disconnect", networkName, containerName ], {
+                    encoding: "utf-8",
+                });
+
+                callbackResult({
+                    ok: true,
+                    msg: "Updated",
+                    msgi18n: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
     }
 
     isDockgeLabels(labels : unknown) : boolean {
@@ -497,6 +543,21 @@ export class DockerSocketHandler extends AgentSocketHandler {
         return name === "dockge" ||
             this.isDockgeLabels(labels) ||
             this.isDockgeImageName(container.Image);
+    }
+
+    async checkNotDockgeContainer(containerName : string) {
+        const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", containerName ], {
+            encoding: "utf-8",
+        });
+        const inspect = JSON.parse(inspectRes.stdout?.toString() || "[]")[0] || {};
+        const config = inspect.Config as DockerInspectObject | undefined;
+        const container = {
+            Names: inspect.Name || containerName,
+            Image: config?.Image,
+        };
+        if (this.isDockgeContainer(container, config?.Labels)) {
+            throw new ValidationError("Dockge resources cannot be modified here");
+        }
     }
 
     parseDockerJSONLines(stdout : unknown) : Array<Record<string, unknown>> {
@@ -572,11 +633,22 @@ export class DockerSocketHandler extends AgentSocketHandler {
             } catch (e) {
             }
 
-            const connectedContainers = Object.keys((inspect.Containers as object | undefined) || {});
-            const hasDockgeContainer = connectedContainers.some(containerId => dockgeContainerIds.some(dockgeId => dockgeId.startsWith(containerId) || containerId.startsWith(dockgeId)));
-            const hidden = this.isDockgeLabels(inspect.Labels) ||
+            const connectedContainers = Object.entries((inspect.Containers as Record<string, DockerInspectObject> | undefined) || {})
+                .map(([ id, container ]) => ({
+                    id,
+                    name: String(container.Name || id),
+                    ipv4: container.IPv4Address || "",
+                    ipv6: container.IPv6Address || "",
+                    isDockge: dockgeContainerIds.some(dockgeId => dockgeId.startsWith(id) || id.startsWith(dockgeId)),
+                }));
+            const visibleConnectedContainers = connectedContainers.filter(container => !container.isDockge);
+            const hasDockgeContainer = connectedContainers.some(container => container.isDockge);
+            const isBuiltInNetwork = [ "bridge", "host", "none" ].includes(networkName);
+            const hidden = !isBuiltInNetwork && (
+                this.isDockgeLabels(inspect.Labels) ||
                 networkName === "dockge_default" ||
-                (hasDockgeContainer && connectedContainers.length === 1);
+                (hasDockgeContainer && connectedContainers.length === 1)
+            );
 
             return {
                 id: network.ID,
@@ -587,11 +659,11 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 attachable: !!inspect.Attachable,
                 ingress: !!inspect.Ingress,
                 isolated: !!inspect.Internal,
-                unused: connectedContainers.length === 0,
+                unused: visibleConnectedContainers.length === 0,
                 options: inspect.Options || {},
                 labels: inspect.Labels || {},
                 ipam: (inspect.IPAM as DockerInspectObject | undefined)?.Config || [],
-                containers: connectedContainers,
+                containers: visibleConnectedContainers,
                 hidden,
             };
         }));
