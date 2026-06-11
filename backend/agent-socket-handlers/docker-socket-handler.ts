@@ -358,8 +358,10 @@ for p in "$dir"/..?* "$dir"/.[!.]* "$dir"/*; do
     [ -L "$p" ] && type="symlink"
     size=$(stat -c "%s" "$p" 2>/dev/null || wc -c < "$p" 2>/dev/null || echo 0)
     mode=$(stat -c "%a" "$p" 2>/dev/null || echo "")
-    modified=$(stat -c "%y" "$p" 2>/dev/null || echo "")
-    printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$type" "$name" "$size" "$mode" "$modified"
+    modified=$(stat -c "%Y" "$p" 2>/dev/null || echo "")
+    owner=$(stat -c "%U" "$p" 2>/dev/null || echo "")
+    group=$(stat -c "%G" "$p" 2>/dev/null || echo "")
+    printf "%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$type" "$name" "$size" "$mode" "$modified" "$owner" "$group"
 done
 `, [ checkedPath ]);
 
@@ -512,15 +514,31 @@ done
             }
         });
 
-        agentSocket.on("containerFileChmod", async (stackName : unknown, serviceName : unknown, containerPath : unknown, mode : unknown, callback) => {
+        agentSocket.on("containerFileChmod", async (stackName : unknown, serviceName : unknown, containerPath : unknown, mode : unknown, owner : unknown, group : unknown, callback) => {
             try {
                 checkLogin(socket);
                 const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
-                if (typeof(mode) !== "string" || !mode.match(/^[0-7]{3,4}$/)) {
+                if (typeof(mode) !== "string" || (mode !== "" && !mode.match(/^[0-7]{3,4}$/))) {
                     throw new ValidationError("Mode must be an octal value such as 644 or 0755");
                 }
+                if (typeof(owner) !== "string" || typeof(group) !== "string") {
+                    throw new ValidationError("Owner and group must be strings");
+                }
+                if ((owner && !owner.match(/^[A-Za-z0-9_.-]+$/)) || (group && !group.match(/^[A-Za-z0-9_.-]+$/))) {
+                    throw new ValidationError("Owner and group may only contain letters, numbers, underscore, dot, and dash");
+                }
                 const stack = await Stack.getStack(server, checkedStackName);
-                await this.execInService(stack, checkedServiceName, "chmod \"$1\" \"$2\"", [ mode, checkedPath ]);
+                const containerId = await this.getServiceContainerId(stack, checkedServiceName);
+                if (mode) {
+                    await childProcessAsync.spawn("docker", [ "exec", "-u", "0", containerId, "chmod", mode, checkedPath ], {
+                        encoding: "utf-8",
+                    });
+                }
+                if (owner || group) {
+                    await childProcessAsync.spawn("docker", [ "exec", "-u", "0", containerId, "chown", `${owner || ""}:${group || ""}`, checkedPath ], {
+                        encoding: "utf-8",
+                    });
+                }
                 callbackResult({
                     ok: true,
                     msg: "Updated",
@@ -748,13 +766,15 @@ done
             .split("\n")
             .filter(line => line.trim() !== "")
             .map((line) => {
-                const [ type, name, size, mode, modified ] = line.split("\t");
+                const [ type, name, size, mode, modified, owner, group ] = line.split("\t");
                 return {
                     type,
                     name,
                     size: Number(size) || 0,
                     mode,
-                    modified,
+                    modified: Number(modified) || 0,
+                    owner,
+                    group,
                 };
             })
             .sort((a, b) => {

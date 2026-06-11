@@ -9,19 +9,17 @@
                 </button>
             </div>
 
-            <div class="input-group mb-3">
-                <button class="btn btn-normal" :disabled="currentPath === '/'" @click="goUp">
-                    ..
-                </button>
-                <input v-model="pathInput" class="form-control" @keyup.enter="openPath(pathInput)" />
-                <button class="btn btn-primary" @click="openPath(pathInput)">
-                    {{ $t("open") }}
-                </button>
-            </div>
-
-            <div class="shadow-box big-padding mb-3 upload-panel">
-                <h4>{{ $t("uploadFile") }}</h4>
-                <div class="upload-grid">
+            <div class="shadow-box big-padding mb-3 controls-panel">
+                <div class="path-row">
+                    <button class="btn btn-normal" :disabled="currentPath === '/'" @click="goUp">
+                        ..
+                    </button>
+                    <input v-model="pathInput" class="form-control" @keyup.enter="openPath(pathInput)" />
+                    <button class="btn btn-primary" @click="openPath(pathInput)">
+                        {{ $t("open") }}
+                    </button>
+                </div>
+                <div class="upload-row">
                     <input ref="uploadInput" class="form-control" type="file" @change="selectUploadFile" />
                     <input v-model="uploadFilename" class="form-control" :placeholder="$t('fileName')" />
                     <button class="btn btn-primary" :disabled="uploading || !uploadFile" @click="uploadSelectedFile">
@@ -29,51 +27,45 @@
                         {{ $t("upload") }}
                     </button>
                 </div>
-                <div class="form-text">{{ currentPath }}</div>
             </div>
 
             <div v-if="loading" class="shadow-box big-padding">{{ $t("loading") }}</div>
 
             <div v-else class="shadow-box file-manager">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>{{ $t("fileName") }}</th>
-                            <th>{{ $t("type") }}</th>
-                            <th>{{ $t("size") }}</th>
-                            <th>{{ $t("permissions") }}</th>
-                            <th>{{ $t("modified") }}</th>
-                            <th class="text-end">{{ $t("actions") }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="entry in entries" :key="entry.name">
-                            <td>
-                                <button v-if="entry.type === 'directory'" class="btn btn-link p-0" @click="openPath(joinPath(currentPath, entry.name))">
-                                    {{ entry.name }}
-                                </button>
-                                <span v-else>{{ entry.name }}</span>
-                            </td>
-                            <td>{{ entry.type }}</td>
-                            <td>{{ formatSize(entry.size) }}</td>
-                            <td>{{ entry.mode || $t("notAvailableShort") }}</td>
-                            <td>{{ entry.modified || $t("notAvailableShort") }}</td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <button v-if="entry.type !== 'directory'" class="btn btn-sm btn-normal" @click="readFile(joinPath(currentPath, entry.name))">
-                                        <font-awesome-icon icon="eye" />
-                                    </button>
-                                    <button v-if="entry.type !== 'directory'" class="btn btn-sm btn-normal" @click="downloadFile(joinPath(currentPath, entry.name))">
-                                        <font-awesome-icon icon="download" />
-                                    </button>
-                                    <button class="btn btn-sm btn-normal" @click="showChmod(joinPath(currentPath, entry.name), entry.mode)">
-                                        <font-awesome-icon icon="wrench" />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="file-header">
+                    <span>{{ $t("fileName") }}</span>
+                    <span>{{ $t("type") }}</span>
+                    <span>{{ $t("size") }}</span>
+                    <span>{{ $t("permissions") }}</span>
+                    <span>{{ $t("ownerGroup") }}</span>
+                    <span>{{ $t("modified") }}</span>
+                    <span class="text-end">{{ $t("actions") }}</span>
+                </div>
+                <div v-for="entry in entries" :key="entry.name" class="file-row">
+                    <div class="file-name">
+                        <font-awesome-icon :icon="entry.type === 'directory' ? 'folder' : 'file'" class="me-2" />
+                        <button v-if="entry.type === 'directory'" class="file-link" @click="openPath(joinPath(currentPath, entry.name))">
+                            {{ entry.name }}
+                        </button>
+                        <span v-else>{{ entry.name }}</span>
+                    </div>
+                    <div>{{ entry.type }}</div>
+                    <div>{{ formatSize(entry.size) }}</div>
+                    <div>{{ entry.mode || $t("notAvailableShort") }}</div>
+                    <div>{{ formatOwnerGroup(entry) }}</div>
+                    <div>{{ formatModified(entry.modified) }}</div>
+                    <div class="file-actions">
+                        <button v-if="entry.type !== 'directory'" class="btn btn-sm btn-normal" @click="readFile(joinPath(currentPath, entry.name))">
+                            <font-awesome-icon icon="eye" />
+                        </button>
+                        <button v-if="entry.type !== 'directory'" class="btn btn-sm btn-normal" @click="downloadFile(joinPath(currentPath, entry.name))">
+                            <font-awesome-icon icon="download" />
+                        </button>
+                        <button class="btn btn-sm btn-normal" @click="showPermissions(joinPath(currentPath, entry.name), entry)">
+                            <font-awesome-icon icon="wrench" />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div v-if="selectedFile" class="shadow-box big-padding mt-3">
@@ -92,21 +84,38 @@
                 <textarea v-model="fileContent" class="form-control file-editor" spellcheck="false"></textarea>
             </div>
 
-            <div v-if="chmodPath" class="shadow-box big-padding mt-3 chmod-panel">
-                <h4>{{ $t("changePermissions") }}</h4>
-                <div class="input-group">
+            <BModal v-model="showPermissionsModal" :title="$t('changePermissions')" hide-footer>
+                <div class="mb-3">
+                    <label class="form-label">{{ $t("permissions") }}</label>
                     <input v-model="chmodMode" class="form-control" placeholder="0644" @keyup.enter="chmodFile" />
-                    <button class="btn btn-primary" @click="chmodFile">{{ $t("Save") }}</button>
-                    <button class="btn btn-normal" @click="chmodPath = ''">{{ $t("cancel") }}</button>
                 </div>
-                <div class="form-text">{{ chmodPath }}</div>
-            </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">{{ $t("owner") }}</label>
+                        <input v-model="ownerValue" class="form-control" placeholder="root" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">{{ $t("group") }}</label>
+                        <input v-model="groupValue" class="form-control" placeholder="root" />
+                    </div>
+                </div>
+                <div class="form-text mb-3">{{ chmodPath }}</div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-normal me-2" @click="showPermissionsModal = false">{{ $t("cancel") }}</button>
+                    <button class="btn btn-primary" @click="chmodFile">{{ $t("Save") }}</button>
+                </div>
+            </BModal>
         </div>
     </transition>
 </template>
 
 <script>
+import { BModal } from "bootstrap-vue-next";
+
 export default {
+    components: {
+        BModal,
+    },
     data() {
         return {
             loading: true,
@@ -118,6 +127,9 @@ export default {
             fileContent: "",
             chmodPath: "",
             chmodMode: "",
+            ownerValue: "",
+            groupValue: "",
+            showPermissionsModal: false,
             uploadFile: null,
             uploadFilename: "",
             uploading: false,
@@ -215,15 +227,19 @@ export default {
                 link.click();
             });
         },
-        showChmod(path, mode) {
+        showPermissions(path, entry) {
             this.chmodPath = path;
-            this.chmodMode = mode || "";
+            this.chmodMode = entry.mode || "";
+            this.ownerValue = entry.owner || "";
+            this.groupValue = entry.group || "";
+            this.showPermissionsModal = true;
         },
         chmodFile() {
-            this.$root.emitAgent(this.endpoint, "containerFileChmod", this.stackName, this.serviceName, this.chmodPath, this.chmodMode, (res) => {
+            this.$root.emitAgent(this.endpoint, "containerFileChmod", this.stackName, this.serviceName, this.chmodPath, this.chmodMode, this.ownerValue, this.groupValue, (res) => {
                 this.$root.toastRes(res);
                 if (res.ok) {
                     this.chmodPath = "";
+                    this.showPermissionsModal = false;
                     this.loadFiles();
                 }
             });
@@ -266,13 +282,97 @@ export default {
             }
             return `${(size / 1024 / 1024).toFixed(1)} MB`;
         },
+        formatModified(modified) {
+            if (!modified) {
+                return this.$t("notAvailableShort");
+            }
+            return new Date(modified * 1000).toLocaleString();
+        },
+        formatOwnerGroup(entry) {
+            if (!entry.owner && !entry.group) {
+                return this.$t("notAvailableShort");
+            }
+            return `${entry.owner || ""}:${entry.group || ""}`;
+        },
     },
 };
 </script>
 
 <style scoped lang="scss">
+@import "../styles/vars";
+
+.controls-panel {
+    display: grid;
+    gap: 12px;
+}
+
+.path-row,
+.upload-row {
+    display: grid;
+    gap: 8px;
+}
+
+.path-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.upload-row {
+    grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) auto;
+}
+
 .file-manager {
     overflow-x: auto;
+    padding: 0;
+}
+
+.file-header,
+.file-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) 110px 100px 120px 150px 210px 150px;
+    gap: 12px;
+    align-items: center;
+    min-width: 1060px;
+    padding: 12px 16px;
+}
+
+.file-header {
+    border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+    color: #6c757d;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.file-row {
+    border-bottom: 1px solid rgba(128, 128, 128, 0.14);
+
+    &:last-child {
+        border-bottom: 0;
+    }
+}
+
+.file-name {
+    min-width: 0;
+    word-break: break-word;
+}
+
+.file-link {
+    background: none;
+    border: 0;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+}
+
+.file-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+
+    .btn {
+        min-width: 38px;
+    }
 }
 
 .file-editor {
@@ -281,24 +381,9 @@ export default {
     font-size: 0.9rem;
 }
 
-.chmod-panel {
-    max-width: 560px;
-}
-
-.upload-panel {
-    h4 {
-        font-size: 1rem;
-    }
-}
-
-.upload-grid {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) auto;
-    gap: 8px;
-}
-
 @media (max-width: 760px) {
-    .upload-grid {
+    .path-row,
+    .upload-row {
         grid-template-columns: 1fr;
     }
 }
