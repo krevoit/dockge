@@ -8,6 +8,7 @@ import Console from "./pages/Console.vue";
 import DockerResources from "./pages/DockerResources.vue";
 import Compose from "./pages/Compose.vue";
 import ContainerTerminal from "./pages/ContainerTerminal.vue";
+import ContainerFiles from "./pages/ContainerFiles.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 
@@ -55,6 +56,16 @@ const routes = [
                                 path: "/terminal/:stackName/:serviceName/:type/:endpoint",
                                 component: ContainerTerminal,
                                 name: "containerTerminalEndpoint",
+                            },
+                            {
+                                path: "/files/:stackName/:serviceName",
+                                component: ContainerFiles,
+                                name: "containerFiles",
+                            },
+                            {
+                                path: "/files/:stackName/:serviceName/:endpoint",
+                                component: ContainerFiles,
+                                name: "containerFilesEndpoint",
                             },
                         ]
                     },

@@ -4,6 +4,9 @@ import { callbackError, callbackResult, checkLogin, DockgeSocket, ValidationErro
 import { DeleteOptions, Stack } from "../stack";
 import { AgentSocket } from "../../common/agent-socket";
 import childProcessAsync from "promisify-child-process";
+import fs from "fs/promises";
+import os from "os";
+import path from "path";
 
 type DockerInspectObject = Record<string, unknown>;
 
@@ -339,6 +342,195 @@ export class DockerSocketHandler extends AgentSocketHandler {
             }
         });
 
+        agentSocket.on("containerFileList", async (stackName : unknown, serviceName : unknown, containerPath : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                const stack = await Stack.getStack(server, checkedStackName);
+                const stdout = await this.execInService(stack, checkedServiceName, `
+dir="$1"
+[ -d "$dir" ] || { echo "Not a directory" >&2; exit 2; }
+for p in "$dir"/..?* "$dir"/.[!.]* "$dir"/*; do
+    [ -e "$p" ] || continue
+    name=\${p##*/}
+    type="file"
+    [ -d "$p" ] && type="directory"
+    [ -L "$p" ] && type="symlink"
+    size=$(stat -c "%s" "$p" 2>/dev/null || wc -c < "$p" 2>/dev/null || echo 0)
+    mode=$(stat -c "%a" "$p" 2>/dev/null || echo "")
+    modified=$(stat -c "%y" "$p" 2>/dev/null || echo "")
+    printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$type" "$name" "$size" "$mode" "$modified"
+done
+`, [ checkedPath ]);
+
+                callbackResult({
+                    ok: true,
+                    path: checkedPath,
+                    entries: this.parseContainerFileList(stdout),
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("containerFileRead", async (stackName : unknown, serviceName : unknown, containerPath : unknown, callback) => {
+            let tmpFile : string | undefined;
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                const stack = await Stack.getStack(server, checkedStackName);
+                const containerId = await this.getServiceContainerId(stack, checkedServiceName);
+                tmpFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "dockge-file-")), path.posix.basename(checkedPath) || "file");
+                await childProcessAsync.spawn("docker", [ "cp", `${containerId}:${checkedPath}`, tmpFile ], {
+                    encoding: "utf-8",
+                });
+                const buffer = await fs.readFile(tmpFile);
+                if (buffer.length > 1024 * 1024) {
+                    throw new ValidationError("File is too large to edit in the browser");
+                }
+                callbackResult({
+                    ok: true,
+                    content: buffer.toString("utf-8"),
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            } finally {
+                if (tmpFile) {
+                    await fs.rm(path.dirname(tmpFile), {
+                        recursive: true,
+                        force: true,
+                    });
+                }
+            }
+        });
+
+        agentSocket.on("containerFileWrite", async (stackName : unknown, serviceName : unknown, containerPath : unknown, content : unknown, callback) => {
+            let tmpFile : string | undefined;
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                if (typeof(content) !== "string") {
+                    throw new ValidationError("File content must be a string");
+                }
+                const stack = await Stack.getStack(server, checkedStackName);
+                const containerId = await this.getServiceContainerId(stack, checkedServiceName);
+                tmpFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "dockge-file-")), path.posix.basename(checkedPath) || "file");
+                await fs.writeFile(tmpFile, content, "utf-8");
+                await childProcessAsync.spawn("docker", [ "cp", tmpFile, `${containerId}:${checkedPath}` ], {
+                    encoding: "utf-8",
+                });
+                callbackResult({
+                    ok: true,
+                    msg: "Saved",
+                    msgi18n: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            } finally {
+                if (tmpFile) {
+                    await fs.rm(path.dirname(tmpFile), {
+                        recursive: true,
+                        force: true,
+                    });
+                }
+            }
+        });
+
+        agentSocket.on("containerFileDownload", async (stackName : unknown, serviceName : unknown, containerPath : unknown, callback) => {
+            let tmpFile : string | undefined;
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                const stack = await Stack.getStack(server, checkedStackName);
+                const containerId = await this.getServiceContainerId(stack, checkedServiceName);
+                tmpFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "dockge-file-")), path.posix.basename(checkedPath) || "download");
+                await childProcessAsync.spawn("docker", [ "cp", `${containerId}:${checkedPath}`, tmpFile ], {
+                    encoding: "utf-8",
+                });
+                const buffer = await fs.readFile(tmpFile);
+                if (buffer.length > 25 * 1024 * 1024) {
+                    throw new ValidationError("File is too large to download through the browser");
+                }
+                callbackResult({
+                    ok: true,
+                    filename: path.posix.basename(checkedPath) || "download",
+                    contentBase64: buffer.toString("base64"),
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            } finally {
+                if (tmpFile) {
+                    await fs.rm(path.dirname(tmpFile), {
+                        recursive: true,
+                        force: true,
+                    });
+                }
+            }
+        });
+
+        agentSocket.on("containerFileUpload", async (stackName : unknown, serviceName : unknown, containerPath : unknown, filename : unknown, contentBase64 : unknown, callback) => {
+            let tmpFile : string | undefined;
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                if (typeof(filename) !== "string" || filename.trim() === "") {
+                    throw new ValidationError("Filename is required");
+                }
+                if (typeof(contentBase64) !== "string") {
+                    throw new ValidationError("Uploaded file content must be base64");
+                }
+                const safeFilename = path.posix.basename(filename);
+                if (!safeFilename || safeFilename === "." || safeFilename === "..") {
+                    throw new ValidationError("Invalid filename");
+                }
+                const buffer = Buffer.from(contentBase64, "base64");
+                if (buffer.length > 25 * 1024 * 1024) {
+                    throw new ValidationError("File is too large to upload through the browser");
+                }
+                const stack = await Stack.getStack(server, checkedStackName);
+                const containerId = await this.getServiceContainerId(stack, checkedServiceName);
+                tmpFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "dockge-upload-")), safeFilename);
+                await fs.writeFile(tmpFile, buffer);
+                const targetPath = checkedPath.endsWith("/") ? `${checkedPath}${safeFilename}` : `${checkedPath}/${safeFilename}`;
+                await childProcessAsync.spawn("docker", [ "cp", tmpFile, `${containerId}:${targetPath}` ], {
+                    encoding: "utf-8",
+                });
+                callbackResult({
+                    ok: true,
+                    msg: "Uploaded",
+                    msgi18n: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            } finally {
+                if (tmpFile) {
+                    await fs.rm(path.dirname(tmpFile), {
+                        recursive: true,
+                        force: true,
+                    });
+                }
+            }
+        });
+
+        agentSocket.on("containerFileChmod", async (stackName : unknown, serviceName : unknown, containerPath : unknown, mode : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const { stackName: checkedStackName, serviceName: checkedServiceName, containerPath: checkedPath } = this.checkContainerFileArgs(stackName, serviceName, containerPath);
+                if (typeof(mode) !== "string" || !mode.match(/^[0-7]{3,4}$/)) {
+                    throw new ValidationError("Mode must be an octal value such as 644 or 0755");
+                }
+                const stack = await Stack.getStack(server, checkedStackName);
+                await this.execInService(stack, checkedServiceName, "chmod \"$1\" \"$2\"", [ mode, checkedPath ]);
+                callbackResult({
+                    ok: true,
+                    msg: "Updated",
+                    msgi18n: true,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         // getExternalNetworkList
         agentSocket.on("getDockerNetworkList", async (callback) => {
             try {
@@ -515,6 +707,65 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 callbackError(e, callback);
             }
         });
+    }
+
+    checkContainerFileArgs(stackName : unknown, serviceName : unknown, containerPath : unknown) {
+        if (typeof(stackName) !== "string" || typeof(serviceName) !== "string") {
+            throw new ValidationError("Stack name and service name must be strings");
+        }
+        if (typeof(containerPath) !== "string" || !containerPath.startsWith("/")) {
+            throw new ValidationError("Container path must be an absolute path");
+        }
+        return {
+            stackName,
+            serviceName,
+            containerPath,
+        };
+    }
+
+    async execInService(stack : Stack, serviceName : string, script : string, args : string[] = []) : Promise<string> {
+        const res = await childProcessAsync.spawn("docker", stack.getComposeOptions("exec", "-T", serviceName, "sh", "-c", script, "sh", ...args), {
+            cwd: stack.path,
+            encoding: "utf-8",
+        });
+        return res.stdout?.toString() || "";
+    }
+
+    async getServiceContainerId(stack : Stack, serviceName : string) : Promise<string> {
+        const res = await childProcessAsync.spawn("docker", stack.getComposeOptions("ps", "-q", serviceName), {
+            cwd: stack.path,
+            encoding: "utf-8",
+        });
+        const containerId = res.stdout?.toString().trim().split("\n")[0] || "";
+        if (!containerId) {
+            throw new ValidationError("Container is not running");
+        }
+        return containerId;
+    }
+
+    parseContainerFileList(stdout : string) {
+        return stdout
+            .split("\n")
+            .filter(line => line.trim() !== "")
+            .map((line) => {
+                const [ type, name, size, mode, modified ] = line.split("\t");
+                return {
+                    type,
+                    name,
+                    size: Number(size) || 0,
+                    mode,
+                    modified,
+                };
+            })
+            .sort((a, b) => {
+                if (a.type === "directory" && b.type !== "directory") {
+                    return -1;
+                }
+                if (a.type !== "directory" && b.type === "directory") {
+                    return 1;
+                }
+                return a.name.localeCompare(b.name);
+            });
     }
 
     isDockgeLabels(labels : unknown) : boolean {

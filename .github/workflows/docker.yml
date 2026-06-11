@@ -2,11 +2,14 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "dev-file" ]
 
 permissions:
   contents: read
   packages: write
+
+env:
+  DOCKERHUB_IMAGE: krevoit/dockge
 
 jobs:
   build:
@@ -38,14 +41,26 @@ jobs:
           docker build . \
             --file docker/Dockerfile \
             --target release \
-            --tag ghcr.io/${{ github.repository_owner }}/dockge:latest \
             --tag ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }} \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:latest \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
+            --tag ${{ env.DOCKERHUB_IMAGE }}:${{ github.sha }}
 
-      - name: Push Docker image
+      - name: Push SHA Docker image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/dockge:latest
           docker push ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/dockge:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
+          docker push ${{ env.DOCKERHUB_IMAGE }}:${{ github.sha }}
+
+      - name: Push latest tag
+        if: github.ref == 'refs/heads/master'
+        run: |
+          docker tag ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/dockge:latest
+          docker tag ${{ env.DOCKERHUB_IMAGE }}:${{ github.sha }} ${{ env.DOCKERHUB_IMAGE }}:latest
+          docker push ghcr.io/${{ github.repository_owner }}/dockge:latest
+          docker push ${{ env.DOCKERHUB_IMAGE }}:latest
+
+      - name: Push dev-file tag
+        if: github.ref == 'refs/heads/dev-file'
+        run: |
+          docker tag ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/dockge:dev-file
+          docker tag ${{ env.DOCKERHUB_IMAGE }}:${{ github.sha }} ${{ env.DOCKERHUB_IMAGE }}:dev-file
+          docker push ghcr.io/${{ github.repository_owner }}/dockge:dev-file
+          docker push ${{ env.DOCKERHUB_IMAGE }}:dev-file

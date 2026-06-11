@@ -25,6 +25,10 @@
                             <font-awesome-icon icon="stream" />
                             {{ $t("logs") }}
                         </router-link>
+                        <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal" :to="filesRouteLink">
+                            <font-awesome-icon icon="file" />
+                            {{ $t("files") }}
+                        </router-link>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
                             class="btn btn-primary"
@@ -306,6 +310,27 @@ export default defineComponent({
                         stackName: this.stackName,
                         serviceName: this.name,
                         type: "logs",
+                    },
+                };
+            }
+        },
+
+        filesRouteLink() {
+            if (this.endpoint) {
+                return {
+                    name: "containerFilesEndpoint",
+                    params: {
+                        endpoint: this.endpoint,
+                        stackName: this.stackName,
+                        serviceName: this.name,
+                    },
+                };
+            } else {
+                return {
+                    name: "containerFiles",
+                    params: {
+                        stackName: this.stackName,
+                        serviceName: this.name,
                     },
                 };
             }
