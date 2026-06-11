@@ -512,13 +512,18 @@ export class Stack {
      * @param status
      */
     static async statusConvert(composeStack : ComposeStack) : Promise<number> {
-        if (composeStack.Status.startsWith("created")) {
+        const status = composeStack.Status.toLowerCase();
+
+        if (status.startsWith("created")) {
             return CREATED_STACK;
-        } else if (composeStack.Status.includes("exited")) {
-            return await this.isComposeExitClean(composeStack);
-        } else if (composeStack.Status.startsWith("running")) {
+        } else if (status.includes("running")) {
+            if (status.includes("exited")) {
+                return await this.isComposeExitClean(composeStack);
+            }
             // If there is no exited services, there should be only running services
             return RUNNING;
+        } else if (status.includes("exited")) {
+            return EXITED;
         } else {
             return UNKNOWN;
         }
