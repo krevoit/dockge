@@ -1,6 +1,6 @@
 services:
   dockge:
-    image: cmcooper1980/dockge
+    image: krevoit/dockge
     build:
       context: .
       dockerfile: docker/Dockerfile
