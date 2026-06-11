@@ -12,6 +12,23 @@ A fancy, easy-to-use and reactive self-hosted docker compose stack-oriented mana
 
 View Video: https://youtu.be/AWAlOQeNpgU?t=48
 
+# Enhancements in This Fork
+
+This fork adds several quality-of-life and operations-focused improvements on top of the existing Dockge experience:
+*This is potentially unstable and NOT recommended for production use*
+
+- Stack update indicators in the main stack list, so stacks can show when container image updates appear to be available.
+- Per-container log views using `docker compose logs -f --tail 100 <container-name>`, available from each container card.
+- Improved terminal clipboard handling for copy and paste in the web console and container terminals.
+- A new Resources page in the top navigation for managing Docker containers, networks, volumes, and images.
+- Resource safety filtering that hides Dockge's own container, image, and dedicated resources from destructive actions.
+- Container resource management with status, image, network, port, mount, isolated-state, and delete visibility.
+- Network resource management with internal/isolated/unused indicators, IPAM/options display, create-network controls, and connect/disconnect container membership actions.
+- Network creation support for common drivers such as `bridge`, `macvlan`, `ipvlan`, and `overlay`, including subnet, gateway, parent interface, internal/attachable flags, and custom driver options.
+- Built-in Docker networks such as `bridge`, `host`, and `none` are protected from deletion.
+- Volume and image resource management with unused/dangling indicators to make cleanup safer and easier.
+- GitHub Actions workflow support for CI and GHCR image publishing, including local build steps for Dockge's base and healthcheck images.
+
 # Available Architectures
 
 <table>
