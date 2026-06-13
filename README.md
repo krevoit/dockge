@@ -131,7 +131,7 @@ mkdir -p /opt/stacks /opt/dockge
 cd /opt/dockge
 
 # Download the compose.yaml
-curl https://raw.githubusercontent.com/cmcooper1980/dockge/master/compose.yaml --output compose.yaml
+curl https://raw.githubusercontent.com/krevoit/dockge/master/compose.yaml --output compose.yaml
 
 # Start the server
 docker compose up -d
@@ -144,7 +144,7 @@ Dockge is now running on http://localhost:5001
 
 ### Advanced
 
-If you want to store your stacks in another directory, you can generate your compose.yaml file by using the following URL with custom query strings and change the image from `louislam/dockge:1` to `cmcooper1980/dockge` after downloading if you want to use this fork; or see and update the example docker-compose.yml file at the bottom of this page.
+If you want to store your stacks in another directory, you can generate your compose.yaml file by using the following URL with custom query strings and change the image from `louislam/dockge:1` to `krevoit/dockge` after downloading if you want to use this fork; or see and update the example docker-compose.yml file at the bottom of this page.
 
 ### Download your compose.yaml
 (in the link, change 5001 to your custom port and the /opt/stacks portion to your custom stack location)
@@ -189,7 +189,7 @@ Dockge is built on top of [Compose V2](https://docs.docker.com/compose/migrate/)
 ```
 services:
   dockge:
-    image: cmcooper1980/dockge:latest
+    image: krevoit/dockge:latest
     container_name: dockge
     restart: unless-stopped
     environment:
