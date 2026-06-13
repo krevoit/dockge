@@ -2,7 +2,7 @@
     <img src="./frontend/public/icon.svg" width="128" alt="" />
 </div>
 
-# Dockge
+# Dockge (forked by krevoit)
 
 A fancy, easy-to-use and reactive self-hosted docker compose stack-oriented manager forked from louislam/dockge that has had several Pull Requests merged.
 
@@ -19,7 +19,7 @@ This fork adds several quality-of-life and operations-focused improvements on to
 
 - Stack update indicators in the main stack list, so stacks can show when container image updates appear to be available.
 - Per-container log views using `docker compose logs -f --tail 100 <container-name>`, available from each container card.
-- Improved terminal clipboard handling for copy and paste in the web console and container terminals.
+- Enabled copy and paste in the web console and container terminals.
 - A new Resources page in the top navigation for managing Docker containers, networks, volumes, and images.
 - Resource safety filtering that hides Dockge's own container, image, and dedicated resources from destructive actions.
 - Container resource management with status, image, network, port, mount, isolated-state, and delete visibility.
