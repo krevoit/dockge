@@ -17,39 +17,39 @@
             <div class="col-7">
                 <div class="function">
                     <div class="btn-group me-2" role="group">
-                        <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal" :to="terminalRouteLink" disabled="">
+                        <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
                             <font-awesome-icon icon="terminal" />
                             Bash
                         </router-link>
-                        <router-link v-if="!isEditMode" class="btn btn-normal" :to="logsRouteLink">
+                        <router-link v-if="!isEditMode" class="btn btn-normal action-btn" :to="logsRouteLink">
                             <font-awesome-icon icon="stream" />
                             {{ $t("logs") }}
                         </router-link>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
-                            class="btn btn-primary"
+                            class="btn btn-primary action-btn"
                             :disabled="processing"
                             @click="startService"
                         >
-                            <font-awesome-icon icon="play" class="me-1" />
+                            <font-awesome-icon icon="play" />
                             {{ $t("startStack") }}
                         </button>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
-                            class="btn btn-normal"
+                            class="btn btn-normal action-btn"
                             :disabled="processing"
                             @click="stopService"
                         >
-                            <font-awesome-icon icon="stop" class="me-1" />
+                            <font-awesome-icon icon="stop" />
                             {{ $t("stopStack") }}
                         </button>
                         <button
                             v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
-                            class="btn btn-normal"
+                            class="btn btn-normal action-btn"
                             :disabled="processing"
                             @click="restartService"
                         >
-                            <font-awesome-icon icon="rotate" class="me-1" />
+                            <font-awesome-icon icon="rotate" />
                             {{ $t("restartStack") }}
                         </button>
                     </div>
@@ -437,6 +437,22 @@ export default defineComponent({
         width: 100%;
         align-items: center;
         justify-content: end;
+    }
+
+    .action-btn {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        line-height: 1.2;
+        padding: 0.38rem 0.6rem;
+
+        svg {
+            flex: 0 0 auto;
+            font-size: 0.9rem;
+            height: 0.9rem;
+            width: 0.9rem;
+        }
     }
 
     .stats {

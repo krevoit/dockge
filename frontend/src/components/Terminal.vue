@@ -72,6 +72,9 @@ export default {
             first: true,
             terminalInputBuffer: "",
             cursorPosition: 0,
+            clipboardTargets: [],
+            lastNativePasteAt: 0,
+            pasteFallbackTimer: null,
         };
     },
     created() {
@@ -102,13 +105,7 @@ export default {
         this.terminal.open(this.$refs.terminal);
         this.terminal.focus();
 
-        this.$refs.terminal.addEventListener("copy", this.handleClipboardCopy);
-        this.$refs.terminal.addEventListener("paste", this.handleClipboardPaste);
-
-        // Add selection handler for copy to clipboard
-        this.terminal.onSelectionChange(() => {
-            this.handleSelection();
-        });
+        this.attachClipboardHandlers();
 
         // Notify parent component when data is received
         this.terminal.onCursorMove(() => {
@@ -149,10 +146,8 @@ export default {
 
     unmounted() {
         window.removeEventListener("resize", this.onResizeEvent);
-        if (this.$refs?.terminal) {
-            this.$refs.terminal.removeEventListener("copy", this.handleClipboardCopy);
-            this.$refs.terminal.removeEventListener("paste", this.handleClipboardPaste);
-        }
+        clearTimeout(this.pasteFallbackTimer);
+        this.detachClipboardHandlers();
         this.$root.unbindTerminal(this.name);
         this.terminal.dispose();
     },
@@ -192,8 +187,14 @@ export default {
         },
 
         mainTerminalConfig() {
+            this.terminal.attachCustomKeyEventHandler(this.handleTerminalKeyEvent);
+
             this.terminal.onKey(e => {
                 console.debug("Encode: " + JSON.stringify(e.key));
+
+                if (this.isCopyShortcut(e.domEvent) && this.terminal.hasSelection()) {
+                    return;
+                }
 
                 if (e.key === "\r") {
                     // Return if no input
@@ -247,7 +248,7 @@ export default {
                     this.$root.emitAgent(this.endpoint, "terminalInput", this.name, e.key);
                     this.removeInput();
                 } else if (e.key === "\u0016" || ((e.domEvent?.ctrlKey || e.domEvent?.metaKey) && e.domEvent?.key?.toLowerCase() === "v")) { // Paste
-                    this.handlePaste();
+                    this.queueClipboardPasteFallback();
                 } else if (e.key === "\u0009" || e.key.startsWith("\u001B")) {   // TAB or other special keys
                     // Do nothing
                 } else {
@@ -262,10 +263,16 @@ export default {
         },
 
         interactiveTerminalConfig() {
+            this.terminal.attachCustomKeyEventHandler(this.handleTerminalKeyEvent);
+
             this.terminal.onKey(e => {
+                if (this.isCopyShortcut(e.domEvent) && this.terminal.hasSelection()) {
+                    return;
+                }
+
                 // Handle Ctrl+V for paste
                 if (e.key === "\u0016" || ((e.domEvent?.ctrlKey || e.domEvent?.metaKey) && e.domEvent?.key?.toLowerCase() === "v")) {
-                    this.handlePaste();
+                    this.queueClipboardPasteFallback();
                     return;
                 }
 
@@ -301,6 +308,77 @@ export default {
             this.$root.emitAgent(this.endpoint, "terminalResize", this.name, rows, cols);
         },
 
+        isInputMode() {
+            return this.mode === "mainTerminal" || this.mode === "interactive";
+        },
+
+        isCopyShortcut(event) {
+            return !!event
+                && (event.ctrlKey || event.metaKey)
+                && !event.altKey
+                && event.key?.toLowerCase() === "c";
+        },
+
+        isPasteShortcut(event) {
+            return !!event
+                && (
+                    ((event.ctrlKey || event.metaKey) && !event.altKey && event.key?.toLowerCase() === "v")
+                    || (event.shiftKey && event.key === "Insert")
+                );
+        },
+
+        handleTerminalKeyEvent(event) {
+            if (this.isCopyShortcut(event) && this.terminal.hasSelection()) {
+                event.preventDefault();
+                this.copySelectionToClipboard();
+                return false;
+            }
+
+            if (this.isPasteShortcut(event) && this.isInputMode()) {
+                this.queueClipboardPasteFallback();
+            }
+
+            return true;
+        },
+
+        attachClipboardHandlers() {
+            const targets = [
+                this.$refs.terminal,
+                this.terminal.textarea,
+                this.$refs.terminal?.querySelector(".xterm-helper-textarea"),
+            ].filter(Boolean);
+
+            this.clipboardTargets = [ ...new Set(targets) ];
+
+            for (const target of this.clipboardTargets) {
+                target.addEventListener("copy", this.handleClipboardCopy);
+                target.addEventListener("paste", this.handleClipboardPaste);
+            }
+        },
+
+        detachClipboardHandlers() {
+            for (const target of this.clipboardTargets) {
+                target.removeEventListener("copy", this.handleClipboardCopy);
+                target.removeEventListener("paste", this.handleClipboardPaste);
+            }
+            this.clipboardTargets = [];
+        },
+
+        queueClipboardPasteFallback() {
+            if (!this.isInputMode()) {
+                return;
+            }
+
+            const queuedAt = Date.now();
+            clearTimeout(this.pasteFallbackTimer);
+            this.pasteFallbackTimer = setTimeout(() => {
+                if (this.lastNativePasteAt >= queuedAt) {
+                    return;
+                }
+                this.handlePaste();
+            }, 75);
+        },
+
         /**
          * Handle clipboard paste operation
          */
@@ -322,7 +400,7 @@ export default {
          * Handle native browser paste events from keyboard shortcuts and context menus.
          */
         handleClipboardPaste(event) {
-            if (this.mode !== "mainTerminal" && this.mode !== "interactive") {
+            if (!this.isInputMode()) {
                 return;
             }
 
@@ -332,6 +410,7 @@ export default {
             }
 
             event.preventDefault();
+            this.lastNativePasteAt = Date.now();
             this.pasteText(text);
         },
 
@@ -346,6 +425,35 @@ export default {
 
             event.clipboardData.setData("text/plain", selectedText);
             event.preventDefault();
+        },
+
+        async copySelectionToClipboard() {
+            const selectedText = this.terminal.getSelection();
+            if (!selectedText) {
+                return;
+            }
+
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(selectedText);
+                } else {
+                    this.fallbackCopyText(selectedText);
+                }
+            } catch {
+                this.fallbackCopyText(selectedText);
+            }
+        },
+
+        fallbackCopyText(text) {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
         },
 
         /**
@@ -376,28 +484,6 @@ export default {
                         this.$root.toastRes(res);
                     }
                 });
-            }
-        },
-
-        /**
-         * Handle text selection in terminal - copy to clipboard
-         */
-        handleSelection() {
-            const selectedText = this.terminal.getSelection();
-            if (selectedText && selectedText.length > 0) {
-                this.copyToClipboard(selectedText);
-            }
-        },
-
-        /**
-         * Copy text to clipboard
-         */
-        async copyToClipboard(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                console.debug("Text copied to clipboard:", text);
-            } catch (error) {
-                console.error("Failed to copy to clipboard:", error);
             }
         },
     }
