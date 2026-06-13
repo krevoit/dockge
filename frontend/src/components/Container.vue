@@ -1,8 +1,14 @@
 <template>
     <div class="shadow-box big-padding mb-3 container">
-        <div class="row">
-            <div class="col-5">
-                <h4>{{ name }}</h4>
+        <div class="container-header">
+            <div class="container-summary">
+                <div class="title-row">
+                    <h4>{{ name }}</h4>
+                    <span v-if="hasUpdate" class="update-indicator" :title="updateTitle">
+                        <font-awesome-icon icon="cloud-arrow-down" />
+                        {{ $t("updateAvailable") }}
+                    </span>
+                </div>
                 <div class="image mb-2">
                     <span class="me-1">{{ imageName }}:</span><span class="tag">{{ imageTag }}</span>
                 </div>
@@ -14,45 +20,44 @@
                     </a>
                 </div>
             </div>
-            <div class="col-7">
-                <div class="function">
-                    <div class="btn-group me-2" role="group">
-                        <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
-                            <font-awesome-icon icon="terminal" />
-                            Bash
-                        </router-link>
-                        <router-link v-if="!isEditMode" class="btn btn-normal action-btn" :to="logsRouteLink">
-                            <font-awesome-icon icon="stream" />
-                            {{ $t("logs") }}
-                        </router-link>
-                        <button
-                            v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
-                            class="btn btn-primary action-btn"
-                            :disabled="processing"
-                            @click="startService"
-                        >
-                            <font-awesome-icon icon="play" />
-                            {{ $t("startStack") }}
-                        </button>
-                        <button
-                            v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
-                            class="btn btn-normal action-btn"
-                            :disabled="processing"
-                            @click="stopService"
-                        >
-                            <font-awesome-icon icon="stop" />
-                            {{ $t("stopStack") }}
-                        </button>
-                        <button
-                            v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
-                            class="btn btn-normal action-btn"
-                            :disabled="processing"
-                            @click="restartService"
-                        >
-                            <font-awesome-icon icon="rotate" />
-                            {{ $t("restartStack") }}
-                        </button>
-                    </div>
+
+            <div class="function">
+                <div class="action-group" role="group">
+                    <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
+                        <font-awesome-icon icon="terminal" />
+                        Bash
+                    </router-link>
+                    <router-link v-if="!isEditMode" class="btn btn-normal action-btn" :to="logsRouteLink">
+                        <font-awesome-icon icon="stream" />
+                        {{ $t("logs") }}
+                    </router-link>
+                    <button
+                        v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
+                        class="btn btn-primary action-btn"
+                        :disabled="processing"
+                        @click="startService"
+                    >
+                        <font-awesome-icon icon="play" />
+                        {{ $t("startStack") }}
+                    </button>
+                    <button
+                        v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
+                        class="btn btn-normal action-btn"
+                        :disabled="processing"
+                        @click="stopService"
+                    >
+                        <font-awesome-icon icon="stop" />
+                        {{ $t("stopStack") }}
+                    </button>
+                    <button
+                        v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
+                        class="btn btn-normal action-btn"
+                        :disabled="processing"
+                        @click="restartService"
+                    >
+                        <font-awesome-icon icon="rotate" />
+                        {{ $t("restartStack") }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -225,6 +230,10 @@ export default defineComponent({
             type: Object,
             default: null,
         },
+        updateServices: {
+            type: Array,
+            default: () => [],
+        },
         ports: {
             type: Array,
             default: null
@@ -370,6 +379,12 @@ export default defineComponent({
                 return "";
             }
         },
+        hasUpdate() {
+            return this.updateServices.includes(this.name);
+        },
+        updateTitle() {
+            return `${this.$t("updateAvailable")}: ${this.envsubstService.image || this.name}`;
+        },
         statsInstances() {
             if (!this.serviceStatus) {
                 return [];
@@ -422,25 +437,56 @@ export default defineComponent({
 @import "../styles/vars";
 
 .container {
+    .container-header {
+        align-items: start;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .container-summary {
+        min-width: 0;
+    }
+
+    .title-row {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+
+        h4 {
+            margin-bottom: 0;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+    }
+
     .image {
         font-size: 0.8rem;
         color: #6c757d;
+        overflow-wrap: anywhere;
+
         .tag {
             color: #33383b;
         }
     }
 
     .function {
-        align-content: center;
         display: flex;
-        height: 100%;
-        width: 100%;
-        align-items: center;
-        justify-content: end;
+        min-width: 0;
+        justify-content: start;
+    }
+
+    .action-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        justify-content: start;
     }
 
     .action-btn {
         align-items: center;
+        border-radius: 8px !important;
         display: inline-flex;
         gap: 0.35rem;
         font-size: 0.85rem;
@@ -455,9 +501,25 @@ export default defineComponent({
         }
     }
 
+    .update-indicator {
+        align-items: center;
+        color: $primary;
+        display: inline-flex;
+        font-size: 0.78rem;
+        font-weight: 600;
+        gap: 0.25rem;
+        line-height: 1.2;
+
+        svg {
+            height: 0.78rem;
+            width: 0.78rem;
+        }
+    }
+
     .stats {
         font-size: 0.8rem;
         color: #6c757d;
     }
+
 }
 </style>
