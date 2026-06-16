@@ -8,6 +8,7 @@ import Console from "./pages/Console.vue";
 import DockerResources from "./pages/DockerResources.vue";
 import Compose from "./pages/Compose.vue";
 import ContainerTerminal from "./pages/ContainerTerminal.vue";
+import MobileStackList from "./pages/MobileStackList.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 
@@ -65,6 +66,10 @@ const routes = [
                     {
                         path: "/console/:endpoint",
                         component: Console,
+                    },
+                    {
+                        path: "/stacks",
+                        component: MobileStackList,
                     },
                     {
                         path: "/resources",

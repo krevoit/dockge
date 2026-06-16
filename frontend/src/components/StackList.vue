@@ -24,6 +24,52 @@
                     </form>
                 </div>
 
+                <div class="filter-wrapper">
+                    <button
+                        class="btn btn-link filter-icon-container"
+                        type="button"
+                        :title="$t('Filter')"
+                        @click="filterDropdownOpen = !filterDropdownOpen"
+                    >
+                        <font-awesome-icon class="filter-icon" :class="{ 'filter-icon-active': filtersActive }" icon="filter" />
+                    </button>
+
+                    <div v-if="filterDropdownOpen" class="filter-dropdown">
+                        <button class="filter-dropdown-clear" type="button" :disabled="!filtersActive" @click="clearFilters">
+                            <font-awesome-icon class="me-2" icon="times" />
+                            {{ $t("clearFilter") }}
+                        </button>
+
+                        <div class="filter-section">
+                            <div class="filter-heading">{{ $t("Status") }}</div>
+                            <label v-for="option in statusFilterOptions" :key="option.value" class="filter-option">
+                                <input v-model="filterState.status" class="form-check-input" type="checkbox" :value="option.value" />
+                                <span>{{ $t(option.label) }}</span>
+                            </label>
+                        </div>
+
+                        <div v-if="agentFilterOptions.length > 1" class="filter-section">
+                            <div class="filter-heading">{{ $t("Agent") }}</div>
+                            <label v-for="option in agentFilterOptions" :key="option.value" class="filter-option">
+                                <input v-model="filterState.agents" class="form-check-input" type="checkbox" :value="option.value" />
+                                <span>{{ option.label }}</span>
+                            </label>
+                        </div>
+
+                        <div class="filter-section">
+                            <div class="filter-heading">{{ $t("Attributes") }}</div>
+                            <label class="filter-option">
+                                <input v-model="filterState.attributes" class="form-check-input" type="checkbox" value="hasUpdates" />
+                                <span>{{ $t("updateAvailable") }}</span>
+                            </label>
+                            <label class="filter-option">
+                                <input v-model="filterState.attributes" class="form-check-input" type="checkbox" value="unmanaged" />
+                                <span>{{ $t("Not managed by Dockge") }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="update-all-wrapper">
                     <button class="btn btn-primary" :disabled="processing || flatStackList.length === 0" @click="updateAll">
                         <font-awesome-icon icon="fa-cloud-arrow-down me-1" />
@@ -111,9 +157,12 @@ export default {
             disableSelectAllWatcher: false,
             selectedStacks: {},
             windowTop: 0,
-            filterState: { status: null,
-                active: null,
-                tags: null },
+            filterDropdownOpen: false,
+            filterState: {
+                status: [],
+                agents: [],
+                attributes: [],
+            },
             closedAgents: new Map(),
             processing: false,
         };
@@ -144,22 +193,30 @@ export default {
                         );
                 }
 
-                // active filter
-                let activeMatch = true;
-                if (this.filterState.active != null && this.filterState.active.length > 0) {
-                    activeMatch = this.filterState.active.includes(stack.active);
+                let statusMatch = true;
+                if (this.filterState.status.length > 0) {
+                    statusMatch = this.filterState.status.includes(stack.status);
                 }
 
-                // tags filter
-                let tagsMatch = true;
-                if (this.filterState.tags != null && this.filterState.tags.length > 0) {
-                    tagsMatch = stack.tags
-                        .map(tag => tag.tag_id)
-                        .filter(id => this.filterState.tags.includes(id))
-                        .length > 0;
+                let agentMatch = true;
+                if (this.filterState.agents.length > 0) {
+                    agentMatch = this.filterState.agents.includes(stack.endpoint || "current");
                 }
 
-                return searchTextMatch && activeMatch && tagsMatch;
+                let attributeMatch = true;
+                if (this.filterState.attributes.length > 0) {
+                    attributeMatch = false;
+                    for (const attribute of this.filterState.attributes) {
+                        if (attribute === "hasUpdates" && stack.hasUpdates) {
+                            attributeMatch = true;
+                        }
+                        if (attribute === "unmanaged" && !stack.isManagedByDockge) {
+                            attributeMatch = true;
+                        }
+                    }
+                }
+
+                return searchTextMatch && statusMatch && agentMatch && attributeMatch;
             });
 
             // sort
@@ -249,11 +306,42 @@ export default {
             return Object.keys(this.selectedStacks).length;
         },
         filtersActive() {
-            return this.filterState.status != null ||
-                   this.filterState.active != null ||
-                   this.filterState.tags != null ||
+            return this.filterState.status.length > 0 ||
+                   this.filterState.agents.length > 0 ||
+                   this.filterState.attributes.length > 0 ||
                    this.searchText !== "";
-        }
+        },
+        statusFilterOptions() {
+            return [
+                { value: RUNNING, label: "active" },
+                { value: EXITED, label: "exited" },
+                { value: CREATED_STACK, label: "created_stack" },
+                { value: CREATED_FILE, label: "inactive" },
+                { value: UNKNOWN, label: "unknown" },
+            ];
+        },
+        agentFilterOptions() {
+            return Object.values(this.$root.completeStackList)
+                .reduce((options, stack) => {
+                    const value = stack.endpoint || "current";
+                    if (!options.find(option => option.value === value)) {
+                        options.push({
+                            value,
+                            label: value === "current" ? this.$t("currentEndpoint") : value,
+                        });
+                    }
+                    return options;
+                }, [])
+                .sort((a, b) => {
+                    if (a.value === "current") {
+                        return -1;
+                    }
+                    if (b.value === "current") {
+                        return 1;
+                    }
+                    return a.label.localeCompare(b.label);
+                });
+        },
     },
     watch: {
         searchText() {
@@ -303,8 +391,13 @@ export default {
         clearSearchText() {
             this.searchText = "";
         },
-        updateFilter(newFilter) {
-            this.filterState = newFilter;
+        clearFilters() {
+            this.searchText = "";
+            this.filterState = {
+                status: [],
+                agents: [],
+                attributes: [],
+            };
         },
         deselect(id) {
             delete this.selectedStacks[id];
@@ -415,6 +508,75 @@ export default {
 
 .search-input {
     max-width: 10em;
+}
+
+.filter-wrapper {
+    position: relative;
+}
+
+.filter-icon-container {
+    color: $dark-font-color3;
+    padding: 6px 8px;
+    text-decoration: none;
+}
+
+.filter-icon {
+    color: $dark-font-color3;
+    cursor: pointer;
+}
+
+.filter-icon-active {
+    color: $primary;
+}
+
+.filter-dropdown {
+    background: $dark-bg;
+    border: 1px solid $dark-border-color;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    color: $dark-font-color;
+    min-width: 230px;
+    padding: 8px 0;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 10;
+}
+
+.filter-dropdown-clear {
+    background: transparent;
+    border: 0;
+    color: $dark-font-color;
+    padding: 6px 14px;
+    text-align: left;
+    width: 100%;
+
+    &:disabled {
+        color: $dark-font-color3;
+        cursor: not-allowed;
+    }
+}
+
+.filter-section {
+    border-top: 1px solid $dark-border-color;
+    margin-top: 6px;
+    padding: 8px 14px 2px;
+}
+
+.filter-heading {
+    color: $dark-font-color;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.filter-option {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 7px;
+    white-space: nowrap;
 }
 
 .stack-item {

@@ -10,7 +10,7 @@
         </div>
 
         <!-- Desktop header -->
-        <header v-if="! $root.isMobile" class="d-flex flex-wrap justify-content-center py-3 mb-3 border-bottom">
+        <header v-if="! $root.isMobile || $root.loggedIn" class="d-flex flex-wrap justify-content-center py-3 mb-3 border-bottom">
             <router-link to="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-dark text-decoration-none">
                 <object class="bi me-2 ms-4" width="40" height="40" data="/icon.svg" />
                 <span class="fs-4 title">Dockge</span>
@@ -25,6 +25,12 @@
                 <li v-if="$root.loggedIn" class="nav-item me-2">
                     <router-link to="/" class="nav-link">
                         <font-awesome-icon icon="home" /> {{ $t("home") }}
+                    </router-link>
+                </li>
+
+                <li v-if="$root.loggedIn && $root.isMobile" class="nav-item me-2">
+                    <router-link to="/stacks" class="nav-link">
+                        <font-awesome-icon icon="list" /> {{ $t("Stacks") }}
                     </router-link>
                 </li>
 

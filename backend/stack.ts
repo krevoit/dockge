@@ -20,6 +20,7 @@ import {
 import { InteractiveTerminal, Terminal } from "./terminal";
 import childProcessAsync from "promisify-child-process";
 import { Settings } from "./settings";
+import { ImageRepository } from "./image-repository";
 
 // For getSingleComposeStatus and general compose stack objects
 export interface ComposeStack {
@@ -63,6 +64,7 @@ export class Stack {
 
     protected static managedStackList: Map<string, Stack> = new Map();
     protected static updateInfoCache: Map<string, { checkedAt: number, hasUpdates: boolean, updateServices: string[] }> = new Map();
+    protected static imageRepository: ImageRepository = new ImageRepository();
 
     constructor(server : DockgeServer, name : string, composeYAML? : string, composeENV? : string, composeOverrideYAML? : string, skipFSOperations = false) {
         this.name = name;
@@ -593,29 +595,6 @@ export class Stack {
         }
     }
 
-    protected async hasImageUpdateFromPullDryRun(serviceName : string) : Promise<boolean> {
-        let output = "";
-        try {
-            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("pull", "--dry-run", serviceName), {
-                cwd: this.path,
-                encoding: "utf-8",
-                timeout: 8 * 1000,
-            });
-            output = `${res.stdout?.toString() || ""}\n${res.stderr?.toString() || ""}`;
-        } catch (e) {
-            if (e instanceof Error) {
-                log.debug("refreshUpdateInfo", `Unable to dry-run pull ${this.name}/${serviceName}: ${e.message}`);
-            }
-            return false;
-        }
-
-        if (/(up to date|already exists|skipped|no image to be pulled)/i.test(output) && !/(would pull|download|newer|out of date|updates? available|pull required)/i.test(output)) {
-            return false;
-        }
-
-        return /(would pull|pulling|download|newer|out of date|updates? available|pull required)/i.test(output);
-    }
-
     protected applyCachedUpdateInfo() {
         this._hasUpdates = false;
         this._updateServices = [];
@@ -630,6 +609,20 @@ export class Stack {
     }
 
     protected async refreshUpdateInfo(force = false) {
+        const cacheKey = this.fullPath;
+        const cached = Stack.updateInfoCache.get(cacheKey);
+        const maxAge = 5 * 60 * 1000;
+
+        if (!force && cached && Date.now() - cached.checkedAt < maxAge) {
+            this._hasUpdates = cached.hasUpdates;
+            this._updateServices = cached.updateServices;
+            return;
+        }
+
+        await this.updateImageInfos();
+    }
+
+    async updateImageInfos() {
         this._hasUpdates = false;
         this._updateServices = [];
 
@@ -638,34 +631,65 @@ export class Stack {
         }
 
         const cacheKey = this.fullPath;
-        const cached = Stack.updateInfoCache.get(cacheKey);
-        const maxAge = 5 * 60 * 1000;
-        if (!force && cached && Date.now() - cached.checkedAt < maxAge) {
-            this._hasUpdates = cached.hasUpdates;
-            this._updateServices = cached.updateServices;
-            return;
+        const updateServices: string[] = [];
+        Stack.imageRepository.resetStack(this.name);
+
+        try {
+            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("ps", "--all", "--format", "json"), {
+                cwd: this.path,
+                encoding: "utf-8",
+                timeout: 30 * 1000,
+            });
+
+            if (!res.stdout) {
+                return;
+            }
+
+            const updateServiceInfo = async (serviceInfo: { Service?: string, Image?: string }) => {
+                if (!serviceInfo.Service || !serviceInfo.Image) {
+                    return;
+                }
+
+                try {
+                    const imageInfo = await Stack.imageRepository.update(this.name, serviceInfo.Service, serviceInfo.Image);
+                    if (imageInfo.isImageUpdateAvailable()) {
+                        updateServices.push(serviceInfo.Service);
+                    }
+                } catch (e) {
+                    log.error("updateImageInfos", `Stack '${this.name}' - Image '${serviceInfo.Image}': ${e}`);
+                }
+            };
+
+            for (const line of res.stdout.toString().split("\n")) {
+                if (!line.trim()) {
+                    continue;
+                }
+
+                try {
+                    const parsed = JSON.parse(line);
+                    if (Array.isArray(parsed)) {
+                        await Promise.all(parsed.map(updateServiceInfo));
+                    } else {
+                        await updateServiceInfo(parsed);
+                    }
+                } catch (e) {
+                    log.warn("updateImageInfos", `Unable to parse compose ps output for '${this.name}': ${line}`);
+                }
+            }
+        } catch (e) {
+            log.error("updateImageInfos", `Stack '${this.name}': ${e}`);
         }
 
-        const serviceNames = this.getServiceNames();
-        const updateServices: string[] = [];
-
-        await Promise.all(serviceNames.map(async serviceName => {
-            const hasUpdate = await this.hasImageUpdateFromPullDryRun(serviceName);
-
-            if (hasUpdate) {
-                updateServices.push(serviceName);
-            }
-        }));
-
-        updateServices.sort((a, b) => a.localeCompare(b));
-        const hasUpdates = updateServices.length > 0;
+        const uniqueUpdateServices = [ ...new Set(updateServices) ];
+        uniqueUpdateServices.sort((a, b) => a.localeCompare(b));
+        const hasUpdates = uniqueUpdateServices.length > 0;
 
         this._hasUpdates = hasUpdates;
-        this._updateServices = updateServices;
+        this._updateServices = uniqueUpdateServices;
         Stack.updateInfoCache.set(cacheKey, {
             checkedAt: Date.now(),
             hasUpdates,
-            updateServices,
+            updateServices: uniqueUpdateServices,
         });
     }
 
