@@ -45,14 +45,6 @@ export interface DeleteOptions {
     deleteStackFiles: boolean
 }
 
-interface LocalImageInfo {
-    id: string;
-    repoDigests: string[];
-    os?: string;
-    architecture?: string;
-    variant?: string;
-}
-
 export class Stack {
 
     name: string;
@@ -358,7 +350,7 @@ export class Stack {
         return false;
     }
 
-    static async getStackList(server : DockgeServer, useCacheForManaged = false) : Promise<Map<string, Stack>> {
+    static async getStackList(server : DockgeServer, useCacheForManaged = false, refreshUpdateInfo = false, forceUpdateInfo = false) : Promise<Map<string, Stack>> {
         let stacksDir = server.stacksDir;
         let stackList : Map<string, Stack>;
 
@@ -424,7 +416,13 @@ export class Stack {
             stack._configFilePath = composeStack.ConfigFiles;
         }
 
-        await Promise.all(Array.from(stackList.values()).map(stack => stack.refreshUpdateInfo()));
+        if (refreshUpdateInfo) {
+            await Promise.all(Array.from(stackList.values()).map(stack => stack.refreshUpdateInfo(forceUpdateInfo)));
+        } else {
+            for (const stack of stackList.values()) {
+                stack.applyCachedUpdateInfo();
+            }
+        }
 
         return stackList;
     }
@@ -595,244 +593,13 @@ export class Stack {
         }
     }
 
-    protected async getServiceImages() : Promise<Map<string, string>> {
-        const serviceImages = new Map<string, string>();
-
-        try {
-            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("config", "--format", "json"), {
-                cwd: this.path,
-                encoding: "utf-8",
-                timeout: 30 * 1000,
-            });
-
-            if (!res.stdout) {
-                return serviceImages;
-            }
-
-            const config = JSON.parse(res.stdout.toString());
-            if (!config?.services || typeof config.services !== "object") {
-                return serviceImages;
-            }
-
-            for (const [ serviceName, serviceConfig ] of Object.entries(config.services)) {
-                if (
-                    serviceConfig &&
-                    typeof serviceConfig === "object" &&
-                    "image" in serviceConfig &&
-                    typeof serviceConfig.image === "string" &&
-                    serviceConfig.image.trim() !== ""
-                ) {
-                    serviceImages.set(serviceName, serviceConfig.image);
-                }
-            }
-        } catch (e) {
-            if (e instanceof Error) {
-                log.debug("refreshUpdateInfo", `Unable to read compose config for ${this.name}: ${e.message}`);
-            }
-        }
-
-        return serviceImages;
-    }
-
-    protected async getLocalImageInfo(image : string) : Promise<LocalImageInfo | null> {
-        try {
-            const res = await childProcessAsync.spawn("docker", [ "image", "inspect", image ], {
-                encoding: "utf-8",
-                timeout: 30 * 1000,
-            });
-
-            if (!res.stdout) {
-                return null;
-            }
-
-            const imageInfo = JSON.parse(res.stdout.toString())?.[0];
-            if (!imageInfo?.Id || typeof imageInfo.Id !== "string") {
-                return null;
-            }
-
-            return {
-                id: imageInfo.Id,
-                repoDigests: Array.isArray(imageInfo.RepoDigests) ? imageInfo.RepoDigests.filter((digest : unknown) => typeof digest === "string") : [],
-                os: typeof imageInfo.Os === "string" ? imageInfo.Os : undefined,
-                architecture: typeof imageInfo.Architecture === "string" ? imageInfo.Architecture : undefined,
-                variant: typeof imageInfo.Variant === "string" ? imageInfo.Variant : undefined,
-            };
-        } catch (_) {
-            return null;
-        }
-    }
-
-    protected async getServiceContainerImageIds() : Promise<Map<string, string[]>> {
-        const containerIds = new Map<string, string[]>();
-
-        try {
-            const psRes = await childProcessAsync.spawn("docker", this.getComposeOptions("ps", "--all", "--format", "json"), {
-                cwd: this.path,
-                encoding: "utf-8",
-                timeout: 30 * 1000,
-            });
-
-            if (!psRes.stdout) {
-                return containerIds;
-            }
-
-            const addContainer = async (obj : Record<string, unknown>) => {
-                const serviceName = typeof obj.Service === "string" ? obj.Service : "";
-                const containerId = typeof obj.ID === "string" ? obj.ID : "";
-                if (!serviceName || !containerId) {
-                    return;
-                }
-
-                try {
-                    const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", containerId, "--format", "{{.Image}}" ], {
-                        encoding: "utf-8",
-                        timeout: 30 * 1000,
-                    });
-                    const imageId = inspectRes.stdout?.toString().trim();
-                    if (!imageId) {
-                        return;
-                    }
-
-                    if (!containerIds.has(serviceName)) {
-                        containerIds.set(serviceName, []);
-                    }
-                    containerIds.get(serviceName)?.push(imageId);
-                } catch (e) {
-                    if (e instanceof Error) {
-                        log.debug("refreshUpdateInfo", `Unable to inspect container ${containerId}: ${e.message}`);
-                    }
-                }
-            };
-
-            const lines = psRes.stdout.toString().split("\n").filter(line => line.trim() !== "");
-            for (const line of lines) {
-                try {
-                    const parsed = JSON.parse(line);
-                    if (Array.isArray(parsed)) {
-                        await Promise.all(parsed.map(addContainer));
-                    } else {
-                        await addContainer(parsed);
-                    }
-                } catch (_) {
-                }
-            }
-        } catch (e) {
-            if (e instanceof Error) {
-                log.debug("refreshUpdateInfo", `Unable to read running containers for ${this.name}: ${e.message}`);
-            }
-        }
-
-        return containerIds;
-    }
-
-    protected platformMatches(platform : unknown, localImage : LocalImageInfo) : boolean {
-        if (!platform || typeof platform !== "object") {
-            return true;
-        }
-
-        const typedPlatform = platform as Record<string, unknown>;
-        const os = typeof typedPlatform.os === "string" ? typedPlatform.os : undefined;
-        const architecture = typeof typedPlatform.architecture === "string" ? typedPlatform.architecture : undefined;
-        const variant = typeof typedPlatform.variant === "string" ? typedPlatform.variant : undefined;
-
-        return (!os || !localImage.os || os === localImage.os) &&
-            (!architecture || !localImage.architecture || architecture === localImage.architecture) &&
-            (!variant || !localImage.variant || variant === localImage.variant);
-    }
-
-    protected collectRemoteImageDigests(manifest : unknown, localImage : LocalImageInfo, platform? : unknown) : { configDigests: string[], manifestDigests: string[] } {
-        const configDigests = new Set<string>();
-        const manifestDigests = new Set<string>();
-
-        const collect = (node : unknown, activePlatform? : unknown) => {
-            if (!node || typeof node !== "object") {
-                return;
-            }
-
-            if (Array.isArray(node)) {
-                for (const item of node) {
-                    collect(item, activePlatform);
-                }
-                return;
-            }
-
-            const obj = node as Record<string, unknown>;
-            const descriptor = obj.Descriptor as Record<string, unknown> | undefined;
-            const nextPlatform = obj.Platform || descriptor?.platform || activePlatform;
-            const configDigest = (obj.SchemaV2Manifest as Record<string, Record<string, string>> | undefined)?.config?.digest ||
-                (obj.OCIManifest as Record<string, Record<string, string>> | undefined)?.config?.digest ||
-                (obj.config as Record<string, string> | undefined)?.digest;
-            const manifestDigest = typeof descriptor?.digest === "string" ? descriptor.digest : undefined;
-
-            if (typeof configDigest === "string" && this.platformMatches(nextPlatform, localImage)) {
-                configDigests.add(configDigest);
-            }
-
-            if (manifestDigest && this.platformMatches(nextPlatform, localImage)) {
-                manifestDigests.add(manifestDigest);
-            }
-
-            for (const value of Object.values(obj)) {
-                collect(value, nextPlatform);
-            }
-        };
-
-        collect(manifest, platform);
-        return {
-            configDigests: Array.from(configDigests),
-            manifestDigests: Array.from(manifestDigests),
-        };
-    }
-
-    protected async hasImageUpdate(image : string, currentImageIds : string[] = []) : Promise<boolean | null> {
-        const localImages = (await Promise.all((currentImageIds.length > 0 ? currentImageIds : [ image ]).map(imageRef => this.getLocalImageInfo(imageRef))))
-            .filter((localImage) : localImage is LocalImageInfo => localImage !== null);
-
-        if (localImages.length === 0) {
-            return null;
-        }
-
-        try {
-            const res = await childProcessAsync.spawn("docker", [ "manifest", "inspect", "--verbose", image ], {
-                encoding: "utf-8",
-                timeout: 45 * 1000,
-            });
-
-            if (!res.stdout) {
-                return null;
-            }
-
-            const manifest = JSON.parse(res.stdout.toString());
-            const remoteDigests = this.collectRemoteImageDigests(manifest, localImages[0]);
-
-            if (remoteDigests.configDigests.length > 0) {
-                return localImages.some(localImage => !remoteDigests.configDigests.includes(localImage.id));
-            }
-
-            if (remoteDigests.manifestDigests.length > 0 && localImages.some(localImage => localImage.repoDigests.length > 0)) {
-                return localImages.some(localImage =>
-                    !localImage.repoDigests.some(localDigest =>
-                        remoteDigests.manifestDigests.some(remoteDigest => localDigest.endsWith(remoteDigest))
-                    )
-                );
-            }
-
-            return null;
-        } catch (e) {
-            if (e instanceof Error) {
-                log.debug("refreshUpdateInfo", `Unable to inspect remote image ${image}: ${e.message}`);
-            }
-            return null;
-        }
-    }
-
     protected async hasImageUpdateFromPullDryRun(serviceName : string) : Promise<boolean> {
         let output = "";
         try {
             const res = await childProcessAsync.spawn("docker", this.getComposeOptions("pull", "--dry-run", serviceName), {
                 cwd: this.path,
                 encoding: "utf-8",
-                timeout: 45 * 1000,
+                timeout: 8 * 1000,
             });
             output = `${res.stdout?.toString() || ""}\n${res.stderr?.toString() || ""}`;
         } catch (e) {
@@ -842,14 +609,27 @@ export class Stack {
             return false;
         }
 
-        if (/(up to date|already exists|skipped)/i.test(output) && !/(would pull|download|newer|out of date|updates? available)/i.test(output)) {
+        if (/(up to date|already exists|skipped|no image to be pulled)/i.test(output) && !/(would pull|download|newer|out of date|updates? available|pull required)/i.test(output)) {
             return false;
         }
 
-        return /(would pull|pulling|download|newer|out of date|updates? available)/i.test(output);
+        return /(would pull|pulling|download|newer|out of date|updates? available|pull required)/i.test(output);
     }
 
-    protected async refreshUpdateInfo() {
+    protected applyCachedUpdateInfo() {
+        this._hasUpdates = false;
+        this._updateServices = [];
+
+        const cached = Stack.updateInfoCache.get(this.fullPath);
+        if (!cached) {
+            return;
+        }
+
+        this._hasUpdates = cached.hasUpdates;
+        this._updateServices = cached.updateServices;
+    }
+
+    protected async refreshUpdateInfo(force = false) {
         this._hasUpdates = false;
         this._updateServices = [];
 
@@ -860,28 +640,17 @@ export class Stack {
         const cacheKey = this.fullPath;
         const cached = Stack.updateInfoCache.get(cacheKey);
         const maxAge = 5 * 60 * 1000;
-        if (cached && Date.now() - cached.checkedAt < maxAge) {
+        if (!force && cached && Date.now() - cached.checkedAt < maxAge) {
             this._hasUpdates = cached.hasUpdates;
             this._updateServices = cached.updateServices;
             return;
         }
 
-        const serviceImages = await this.getServiceImages();
-        const serviceContainerImageIds = await this.getServiceContainerImageIds();
-        const serviceNames = serviceImages.size > 0 ? Array.from(serviceImages.keys()) : this.getServiceNames();
+        const serviceNames = this.getServiceNames();
         const updateServices: string[] = [];
 
         await Promise.all(serviceNames.map(async serviceName => {
-            const image = serviceImages.get(serviceName);
-            let hasUpdate: boolean | null = null;
-
-            if (image) {
-                hasUpdate = await this.hasImageUpdate(image, serviceContainerImageIds.get(serviceName) || []);
-            }
-
-            if (hasUpdate === null) {
-                hasUpdate = await this.hasImageUpdateFromPullDryRun(serviceName);
-            }
+            const hasUpdate = await this.hasImageUpdateFromPullDryRun(serviceName);
 
             if (hasUpdate) {
                 updateServices.push(serviceName);

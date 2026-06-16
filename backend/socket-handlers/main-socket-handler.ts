@@ -368,6 +368,7 @@ export class MainSocketHandler extends SocketHandler {
                 delete data.globalENV;
 
                 await Settings.setSettings("general", data);
+                await server.startStackUpdateCheckScheduler();
 
                 callback({
                     ok: true,
@@ -443,6 +444,20 @@ export class MainSocketHandler extends SocketHandler {
                     remoteDigest,
                     localDigests,
                     upToDate,
+                });
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        socket.on("checkStackImageUpdates", async (callback) => {
+            try {
+                checkLogin(socket);
+                await server.runStackUpdateCheck();
+                callback({
+                    ok: true,
+                    msg: "Stack image update check completed",
+                    msgi18n: true,
                 });
             } catch (e) {
                 callbackError(e, callback);

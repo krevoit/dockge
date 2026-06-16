@@ -57,6 +57,62 @@
                 <div class="form-text"></div>
             </div>
 
+            <!-- Stack Image Update Checks -->
+            <div class="mb-4">
+                <h5>{{ $t("Stack Image Update Checks") }}</h5>
+
+                <div class="form-check mb-3">
+                    <label>
+                        <input v-model="settings.stackUpdateCheckEnabled" class="form-check-input" type="checkbox" />
+                        {{ $t("Enable scheduled stack image update checks") }}
+                    </label>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <label class="form-label" for="stackUpdateCheckFrequency">
+                            {{ $t("Frequency") }}
+                        </label>
+                        <select id="stackUpdateCheckFrequency" v-model="settings.stackUpdateCheckFrequency" class="form-select" :disabled="!settings.stackUpdateCheckEnabled">
+                            <option value="daily">{{ $t("Daily") }}</option>
+                            <option value="weekly">{{ $t("Weekly") }}</option>
+                            <option value="fortnightly">{{ $t("Fortnightly") }}</option>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label" for="stackUpdateCheckTime">
+                            {{ $t("Scheduled Time") }}
+                        </label>
+                        <input id="stackUpdateCheckTime" v-model="settings.stackUpdateCheckTime" class="form-control" type="time" :disabled="!settings.stackUpdateCheckEnabled" />
+                    </div>
+
+                    <div class="col-lg-4">
+                        <label class="form-label" for="stackUpdateCheckTimezone">
+                            {{ $t("Timezone") }}
+                        </label>
+                        <select id="stackUpdateCheckTimezone" v-model="settings.stackUpdateCheckTimezone" class="form-select" :disabled="!settings.stackUpdateCheckEnabled">
+                            <option value="UTC">UTC</option>
+                            <option
+                                v-for="(timezone, index) in timezoneList"
+                                :key="index"
+                                :value="timezone.value"
+                            >
+                                {{ timezone.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button class="btn btn-normal me-2" type="button" :disabled="checkingUpdates" @click="checkStackUpdatesNow">
+                        <font-awesome-icon icon="arrows-rotate" class="me-1" />
+                        {{ $t("Check updates now") }}
+                    </button>
+                    <span v-if="checkingUpdates" class="form-text">{{ $t("Checking for updates...") }}</span>
+                </div>
+            </div>
+
             <!-- Save Button -->
             <div>
                 <button class="btn btn-primary" type="submit">
@@ -80,6 +136,7 @@ export default {
     data() {
         return {
             timezoneList: timezoneList(),
+            checkingUpdates: false,
         };
     },
 
@@ -108,7 +165,13 @@ export default {
         autoGetPrimaryHostname() {
             this.settings.primaryHostname = location.hostname;
         },
+        checkStackUpdatesNow() {
+            this.checkingUpdates = true;
+            this.$root.getSocket().emit("checkStackImageUpdates", (res) => {
+                this.checkingUpdates = false;
+                this.$root.toastRes(res);
+            });
+        },
     },
 };
 </script>
-

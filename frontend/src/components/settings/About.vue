@@ -11,20 +11,21 @@
             </div>
 
             <div class="my-3 update-link">
-                <a href="https://github.com/krevoit/dockge" target="_blank" rel="noopener">github.com/krevoit/dockge</a>
+                <a href="https://github.com/krevoit/dockge" target="_blank" rel="noopener">{{ $t("View Repo") }}</a>
             </div>
 
             <div class="docker-update-checks">
                 <h5>{{ $t("Docker Image Update Checks") }}</h5>
 
-                <div v-for="item in dockerImageChecks" :key="item.tag" class="docker-update-check">
-                    <button class="btn btn-normal btn-sm" :disabled="item.loading" @click="checkDockerImageUpdate(item.tag)">
-                        <font-awesome-icon icon="arrows-rotate" class="me-1" />
-                        {{ $t("Check for updates to", [ item.image ]) }}
-                    </button>
-                    <div v-if="item.result" class="docker-update-result" :class="item.resultClass">
-                        {{ item.result }}
-                    </div>
+                <label class="form-label" for="dockgeImageUpdateTag">{{ $t("Image Channel") }}</label>
+                <select id="dockgeImageUpdateTag" v-model="selectedImageTag" class="form-select form-select-sm">
+                    <option value="latest">krevoit/dockge:latest</option>
+                    <option value="dev">krevoit/dockge:dev</option>
+                </select>
+
+                <div class="docker-update-result mt-2" :class="selectedImageCheck.resultClass">
+                    <span v-if="selectedImageCheck.loading">{{ $t("Checking for updates...") }}</span>
+                    <span v-else-if="selectedImageCheck.result">{{ selectedImageCheck.result }}</span>
                 </div>
             </div>
 
@@ -57,6 +58,7 @@ export default {
                     resultClass: "",
                 },
             },
+            selectedImageTag: "latest",
         };
     },
     computed: {
@@ -69,19 +71,19 @@ export default {
         settingsLoaded() {
             return this.$parent.$parent.$parent.settingsLoaded;
         },
-        dockerImageChecks() {
-            return [ "latest", "dev" ].map(tag => ({
-                tag,
-                image: `krevoit/dockge:${tag}`,
-                loading: this.imageChecks[tag].loading,
-                result: this.imageChecks[tag].result,
-                resultClass: this.imageChecks[tag].resultClass,
-            }));
+        selectedImageCheck() {
+            return this.imageChecks[this.selectedImageTag];
         },
     },
 
     watch: {
+        selectedImageTag() {
+            this.checkDockerImageUpdate(this.selectedImageTag);
+        }
+    },
 
+    mounted() {
+        this.checkDockerImageUpdate(this.selectedImageTag);
     },
 
     methods: {
