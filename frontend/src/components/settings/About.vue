@@ -10,7 +10,23 @@
                 ⚠️ {{ $t("Frontend Version do not match backend version!") }}
             </div>
 
-            <div class="my-3 update-link"><a href="https://github.com/louislam/dockge/releases" target="_blank" rel="noopener">{{ $t("Check Update On GitHub") }}</a></div>
+            <div class="my-3 update-link">
+                <a href="https://github.com/krevoit/dockge" target="_blank" rel="noopener">github.com/krevoit/dockge</a>
+            </div>
+
+            <div class="docker-update-checks">
+                <h5>{{ $t("Docker Image Update Checks") }}</h5>
+
+                <div v-for="item in dockerImageChecks" :key="item.tag" class="docker-update-check">
+                    <button class="btn btn-normal btn-sm" :disabled="item.loading" @click="checkDockerImageUpdate(item.tag)">
+                        <font-awesome-icon icon="arrows-rotate" class="me-1" />
+                        {{ $t("Check for updates to", [ item.image ]) }}
+                    </button>
+                    <div v-if="item.result" class="docker-update-result" :class="item.resultClass">
+                        {{ item.result }}
+                    </div>
+                </div>
+            </div>
 
             <div class="mt-1">
                 <div class="form-check">
@@ -27,6 +43,22 @@
 
 <script>
 export default {
+    data() {
+        return {
+            imageChecks: {
+                latest: {
+                    loading: false,
+                    result: "",
+                    resultClass: "",
+                },
+                dev: {
+                    loading: false,
+                    result: "",
+                    resultClass: "",
+                },
+            },
+        };
+    },
     computed: {
         settings() {
             return this.$parent.$parent.$parent.settings;
@@ -37,10 +69,49 @@ export default {
         settingsLoaded() {
             return this.$parent.$parent.$parent.settingsLoaded;
         },
+        dockerImageChecks() {
+            return [ "latest", "dev" ].map(tag => ({
+                tag,
+                image: `krevoit/dockge:${tag}`,
+                loading: this.imageChecks[tag].loading,
+                result: this.imageChecks[tag].result,
+                resultClass: this.imageChecks[tag].resultClass,
+            }));
+        },
     },
 
     watch: {
 
+    },
+
+    methods: {
+        checkDockerImageUpdate(tag) {
+            const check = this.imageChecks[tag];
+            check.loading = true;
+            check.result = "";
+            check.resultClass = "";
+
+            this.$root.getSocket().emit("checkDockerImageUpdate", tag, (res) => {
+                check.loading = false;
+
+                if (!res.ok) {
+                    check.result = res.msg;
+                    check.resultClass = "text-danger";
+                    return;
+                }
+
+                if (res.upToDate === true) {
+                    check.result = this.$t("Docker image is up to date");
+                    check.resultClass = "text-success";
+                } else if (res.upToDate === false) {
+                    check.result = this.$t("Docker image update available");
+                    check.resultClass = "text-warning";
+                } else {
+                    check.result = this.$t("Local Docker image was not found");
+                    check.resultClass = "text-muted";
+                }
+            });
+        },
     }
 };
 </script>
@@ -52,6 +123,20 @@ export default {
 
 .update-link {
     font-size: 0.8em;
+}
+
+.docker-update-checks {
+    margin: 1rem 0;
+    width: min(420px, 100%);
+}
+
+.docker-update-check {
+    margin-top: 0.6rem;
+}
+
+.docker-update-result {
+    font-size: 0.8em;
+    margin-top: 0.25rem;
 }
 
 .frontend-version {

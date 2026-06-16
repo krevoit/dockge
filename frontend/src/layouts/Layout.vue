@@ -14,9 +14,10 @@
             <router-link to="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-dark text-decoration-none">
                 <object class="bi me-2 ms-4" width="40" height="40" data="/icon.svg" />
                 <span class="fs-4 title">Dockge</span>
+                <span class="fork-label">(krevoit Fork)</span>
             </router-link>
 
-            <a v-if="hasNewVersion" target="_blank" href="https://github.com/louislam/dockge/releases" class="btn btn-warning me-3">
+            <a v-if="hasNewVersion" target="_blank" href="https://github.com/krevoit/dockge/releases" class="btn btn-warning me-3">
                 <font-awesome-icon icon="arrow-alt-circle-up" /> {{ $t("newUpdate") }}
             </a>
 
@@ -211,6 +212,13 @@ main {
 
 .title {
     font-weight: bold;
+}
+
+.fork-label {
+    color: $dark-font-color;
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
 }
 
 .nav {

@@ -20,6 +20,10 @@ import jwt from "jsonwebtoken";
 import { Settings } from "../settings";
 import fs, { promises as fsAsync } from "fs";
 import path from "path";
+import childProcessAsync from "promisify-child-process";
+
+const FORK_IMAGE_REPOSITORY = "krevoit/dockge";
+const FORK_IMAGE_TAGS = [ "latest", "dev" ];
 
 async function verifyTurnstileToken(token: string, clientIP: string, secretKey: string): Promise<boolean> {
     if (!token) {
@@ -417,6 +421,89 @@ export class MainSocketHandler extends SocketHandler {
                 callbackError(e, callback);
             }
         });
+
+        socket.on("checkDockerImageUpdate", async (tag : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof tag !== "string" || !FORK_IMAGE_TAGS.includes(tag)) {
+                    throw new ValidationError("Unsupported Docker image tag");
+                }
+
+                const image = `${FORK_IMAGE_REPOSITORY}:${tag}`;
+                const remoteDigest = await this.getDockerHubImageDigest(FORK_IMAGE_REPOSITORY, tag);
+                const localDigests = await this.getLocalDockerImageDigests(image);
+                const upToDate = localDigests.length > 0
+                    ? localDigests.some(digest => digest.endsWith(remoteDigest))
+                    : null;
+
+                callback({
+                    ok: true,
+                    image,
+                    remoteDigest,
+                    localDigests,
+                    upToDate,
+                });
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+    }
+
+    async getDockerHubImageDigest(repository : string, tag : string) : Promise<string> {
+        const authURL = new URL("https://auth.docker.io/token");
+        authURL.searchParams.set("service", "registry.docker.io");
+        authURL.searchParams.set("scope", `repository:${repository}:pull`);
+
+        const tokenRes = await fetch(authURL);
+        if (!tokenRes.ok) {
+            throw new Error(`Failed to get Docker Hub token for ${repository}:${tag}`);
+        }
+
+        const tokenData = await tokenRes.json();
+        if (!tokenData.token) {
+            throw new Error(`Docker Hub did not return a token for ${repository}:${tag}`);
+        }
+
+        const manifestRes = await fetch(`https://registry-1.docker.io/v2/${repository}/manifests/${tag}`, {
+            headers: {
+                "Accept": [
+                    "application/vnd.docker.distribution.manifest.list.v2+json",
+                    "application/vnd.docker.distribution.manifest.v2+json",
+                    "application/vnd.oci.image.index.v1+json",
+                    "application/vnd.oci.image.manifest.v1+json",
+                ].join(", "),
+                "Authorization": `Bearer ${tokenData.token}`,
+            },
+        });
+
+        if (!manifestRes.ok) {
+            throw new Error(`Failed to get Docker Hub manifest for ${repository}:${tag}`);
+        }
+
+        const digest = manifestRes.headers.get("docker-content-digest");
+        if (!digest) {
+            throw new Error(`Docker Hub did not return a digest for ${repository}:${tag}`);
+        }
+
+        return digest;
+    }
+
+    async getLocalDockerImageDigests(image : string) : Promise<string[]> {
+        try {
+            const res = await childProcessAsync.spawn("docker", [ "image", "inspect", image, "--format", "{{json .RepoDigests}}" ], {
+                encoding: "utf-8",
+            });
+
+            if (!res.stdout) {
+                return [];
+            }
+
+            const digests = JSON.parse(res.stdout.toString().trim());
+            return Array.isArray(digests) ? digests.filter(digest => typeof digest === "string") : [];
+        } catch (_) {
+            return [];
+        }
     }
 
     async login(username : string, password : string) : Promise<User | null> {
