@@ -4,6 +4,9 @@
             <h1 v-if="isAdd" class="mb-3">{{ $t("compose") }}</h1>
             <h1 v-else class="mb-3">
                 <Uptime :stack="globalStack" :pill="true" /> {{ stack.name }}
+                <span v-if="globalStack?.hasUpdates" class="stack-update-indicator" :title="stackUpdateTitle">
+                    <font-awesome-icon icon="cloud-arrow-down" />
+                </span>
                 <span v-if="$root.agentCount > 1 && endpoint !== ''" class="agent-name">
                     ({{ endpointDisplay }})
                 </span>
@@ -540,6 +543,14 @@ export default {
             return this.$root.completeStackList[this.stack.name + "_" + this.endpoint];
         },
 
+        stackUpdateTitle() {
+            const services = this.globalStack?.updateServices || [];
+            if (services.length > 0) {
+                return `${this.$t("updateAvailable")}: ${services.join(", ")}`;
+            }
+            return this.$t("updateAvailable");
+        },
+
         status() {
             return this.globalStack?.status;
         },
@@ -1058,5 +1069,13 @@ export default {
 .agent-name {
     font-size: 13px;
     color: $dark-font-color3;
+}
+
+.stack-update-indicator {
+    color: $primary;
+    display: inline-flex;
+    font-size: 0.85rem;
+    margin-left: 0.35rem;
+    vertical-align: middle;
 }
 </style>

@@ -79,7 +79,8 @@ export class DockgeServer {
     jwtSecret : string = "";
 
     stacksDir : string = "";
-    stackUpdateCheckCron? : { stop: () => void };
+    stackUpdateCheckTimer? : NodeJS.Timeout;
+    stackUpdateCheckPromise? : Promise<void>;
 
     /**
      *
@@ -621,10 +622,33 @@ export class DockgeServer {
     }
 
     async runStackUpdateCheck() {
+        if (this.stackUpdateCheckPromise) {
+            return this.stackUpdateCheckPromise;
+        }
+
+        this.stackUpdateCheckPromise = this.performStackUpdateCheck();
+        try {
+            await this.stackUpdateCheckPromise;
+        } finally {
+            this.stackUpdateCheckPromise = undefined;
+        }
+    }
+
+    protected async performStackUpdateCheck() {
         log.info("stack-update-checker", "Checking stack/container image updates");
-        await Stack.getStackList(this, false, true, true);
+        const stackList = await Stack.getStackList(this, false, true, true);
+        let stacksWithUpdates = 0;
+        let servicesWithUpdates = 0;
+        for (const stack of stackList.values()) {
+            const stackData = stack.toSimpleJSON("") as { hasUpdates?: boolean, updateServices?: string[] };
+            if (stackData.hasUpdates) {
+                stacksWithUpdates++;
+                servicesWithUpdates += stackData.updateServices?.length ?? 0;
+            }
+        }
         await Settings.set("stackUpdateCheckLastRun", Date.now(), "general");
         await this.sendStackList(true);
+        log.info("stack-update-checker", `Finished: ${stacksWithUpdates} stack(s), ${servicesWithUpdates} service(s) with updates`);
     }
 
     async runScheduledStackUpdateCheck() {
@@ -635,70 +659,58 @@ export class DockgeServer {
     }
 
     async startStackUpdateCheckScheduler() {
-        if (this.stackUpdateCheckCron) {
-            this.stackUpdateCheckCron.stop();
-            this.stackUpdateCheckCron = undefined;
+        if (this.stackUpdateCheckTimer) {
+            clearTimeout(this.stackUpdateCheckTimer);
+            this.stackUpdateCheckTimer = undefined;
         }
 
         const enabled = await Settings.get("stackUpdateCheckEnabled");
-        if (!enabled) {
+        if (enabled === false) {
             return;
         }
 
-        const time = await Settings.get("stackUpdateCheckTime") || "03:00";
-        const timezone = await Settings.get("stackUpdateCheckTimezone") || await this.getTimezone();
-        const cronExpression = this.getStackUpdateCheckCronExpression(time);
+        const intervalHours = await this.getStackUpdateCheckIntervalHours();
+        const intervalMs = intervalHours * 60 * 60 * 1000;
+        const lastRun = await Settings.get("stackUpdateCheckLastRun");
+        const lastRunNumber = typeof lastRun === "number" ? lastRun : 0;
+        const elapsedMs = lastRunNumber ? Date.now() - lastRunNumber : intervalMs;
+        const initialDelay = Math.min(intervalMs, Math.max(0, intervalMs - elapsedMs));
 
-        if (!cronExpression) {
-            log.warn("stack-update-checker", `Unsupported stack update check time: ${time}`);
-            return;
-        }
-
-        try {
-            this.stackUpdateCheckCron = Cron(cronExpression, {
-                protect: true,
-                timezone,
-            }, () => {
-                this.runScheduledStackUpdateCheck().catch((e) => {
+        this.stackUpdateCheckTimer = setTimeout(async () => {
+            this.stackUpdateCheckTimer = undefined;
+            try {
+                await this.runScheduledStackUpdateCheck();
+            } catch (e) {
+                log.error("stack-update-checker", e);
+            } finally {
+                try {
+                    await this.startStackUpdateCheckScheduler();
+                } catch (e) {
                     log.error("stack-update-checker", e);
-                });
-            });
-        } catch (e) {
-            log.error("stack-update-checker", e);
-            return;
-        }
-
-        log.info("stack-update-checker", `Scheduled stack/container update checks at ${time} (${timezone})`);
+                }
+            }
+        }, initialDelay);
+        log.info("stack-update-checker", `Scheduled stack/container update checks every ${intervalHours} hour(s)`);
     }
 
     async shouldRunStackUpdateCheck() : Promise<boolean> {
-        const frequency = await Settings.get("stackUpdateCheckFrequency") || "daily";
+        const intervalHours = await this.getStackUpdateCheckIntervalHours();
         const lastRun = await Settings.get("stackUpdateCheckLastRun");
         const lastRunNumber = typeof lastRun === "number" ? lastRun : 0;
-        const elapsedMs = Date.now() - lastRunNumber;
 
         if (!lastRunNumber) {
             return true;
         }
 
-        switch (frequency) {
-            case "daily":
-                return elapsedMs >= 24 * 60 * 60 * 1000;
-            case "weekly":
-                return elapsedMs >= 7 * 24 * 60 * 60 * 1000;
-            case "fortnightly":
-                return elapsedMs >= 14 * 24 * 60 * 60 * 1000;
-            default:
-                return false;
-        }
+        return Date.now() - lastRunNumber >= intervalHours * 60 * 60 * 1000;
     }
 
-    getStackUpdateCheckCronExpression(time : unknown) : string | null {
-        const timeString = typeof time === "string" ? time : "03:00";
-        const match = timeString.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-        const hour = match ? match[1] : "03";
-        const minute = match ? match[2] : "00";
-        return `${minute} ${hour} * * *`;
+    async getStackUpdateCheckIntervalHours() : Promise<number> {
+        const configured = Number(await Settings.get("stackUpdateCheckIntervalHours"));
+        if (!Number.isInteger(configured) || configured < 1 || configured > 168) {
+            return 6;
+        }
+        return configured;
     }
 
     async getDockerNetworkList() : Promise<string[]> {
@@ -765,9 +777,9 @@ export class DockgeServer {
         log.info("server", "Called signal: " + signal);
 
         // TODO: Close all terminals?
-        if (this.stackUpdateCheckCron) {
-            this.stackUpdateCheckCron.stop();
-            this.stackUpdateCheckCron = undefined;
+        if (this.stackUpdateCheckTimer) {
+            clearTimeout(this.stackUpdateCheckTimer);
+            this.stackUpdateCheckTimer = undefined;
         }
 
         await Database.close();

@@ -419,7 +419,11 @@ export class Stack {
         }
 
         if (refreshUpdateInfo) {
-            await Promise.all(Array.from(stackList.values()).map(stack => stack.refreshUpdateInfo(forceUpdateInfo)));
+            // Registry checks are intentionally sequential to avoid rate limits and
+            // large bursts of Docker/skopeo processes on hosts with many stacks.
+            for (const stack of stackList.values()) {
+                await stack.refreshUpdateInfo(forceUpdateInfo);
+            }
         } else {
             for (const stack of stackList.values()) {
                 stack.applyCachedUpdateInfo();
@@ -626,7 +630,7 @@ export class Stack {
         this._hasUpdates = false;
         this._updateServices = [];
 
-        if (!this.isManagedByDockge || this.status === CREATED_FILE || this.status === UNKNOWN) {
+        if (!this.isManagedByDockge) {
             return;
         }
 
@@ -635,45 +639,33 @@ export class Stack {
         Stack.imageRepository.resetStack(this.name);
 
         try {
-            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("ps", "--all", "--format", "json"), {
+            // Compose config includes stopped services and resolves image variables.
+            // Using `compose ps` here misses services that do not currently have a
+            // container and has varied JSON output between Compose releases.
+            const res = await childProcessAsync.spawn("docker", this.getComposeOptions("config", "--format", "json"), {
                 cwd: this.path,
                 encoding: "utf-8",
                 timeout: 30 * 1000,
             });
 
-            if (!res.stdout) {
-                return;
-            }
+            const composeConfig = res.stdout ? JSON.parse(res.stdout.toString()) : {};
+            const services = composeConfig?.services;
 
-            const updateServiceInfo = async (serviceInfo: { Service?: string, Image?: string }) => {
-                if (!serviceInfo.Service || !serviceInfo.Image) {
-                    return;
-                }
-
-                try {
-                    const imageInfo = await Stack.imageRepository.update(this.name, serviceInfo.Service, serviceInfo.Image);
-                    if (imageInfo.isImageUpdateAvailable()) {
-                        updateServices.push(serviceInfo.Service);
+            if (services && typeof services === "object") {
+                for (const [ serviceName, serviceConfig ] of Object.entries(services)) {
+                    const image = (serviceConfig as { image?: unknown })?.image;
+                    if (typeof image !== "string" || !image.trim()) {
+                        continue;
                     }
-                } catch (e) {
-                    log.error("updateImageInfos", `Stack '${this.name}' - Image '${serviceInfo.Image}': ${e}`);
-                }
-            };
 
-            for (const line of res.stdout.toString().split("\n")) {
-                if (!line.trim()) {
-                    continue;
-                }
-
-                try {
-                    const parsed = JSON.parse(line);
-                    if (Array.isArray(parsed)) {
-                        await Promise.all(parsed.map(updateServiceInfo));
-                    } else {
-                        await updateServiceInfo(parsed);
+                    try {
+                        const imageInfo = await Stack.imageRepository.update(this.name, serviceName, image);
+                        if (imageInfo.isImageUpdateAvailable()) {
+                            updateServices.push(serviceName);
+                        }
+                    } catch (e) {
+                        log.error("updateImageInfos", `Stack '${this.name}' service '${serviceName}' - Image '${image}': ${e}`);
                     }
-                } catch (e) {
-                    log.warn("updateImageInfos", `Unable to parse compose ps output for '${this.name}': ${line}`);
                 }
             }
         } catch (e) {

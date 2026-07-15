@@ -454,6 +454,7 @@ export class MainSocketHandler extends SocketHandler {
             try {
                 checkLogin(socket);
                 await server.runStackUpdateCheck();
+                await server.startStackUpdateCheckScheduler();
                 callback({
                     ok: true,
                     msg: "Stack image update check completed",

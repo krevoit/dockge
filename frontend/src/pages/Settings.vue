@@ -124,16 +124,10 @@ export default {
                     this.settings.checkUpdate = true;
                 }
                 if (this.settings.stackUpdateCheckEnabled === undefined) {
-                    this.settings.stackUpdateCheckEnabled = false;
+                    this.settings.stackUpdateCheckEnabled = true;
                 }
-                if (!this.settings.stackUpdateCheckFrequency) {
-                    this.settings.stackUpdateCheckFrequency = "daily";
-                }
-                if (!this.settings.stackUpdateCheckTime) {
-                    this.settings.stackUpdateCheckTime = "03:00";
-                }
-                if (!this.settings.stackUpdateCheckTimezone) {
-                    this.settings.stackUpdateCheckTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+                if (!this.settings.stackUpdateCheckIntervalHours) {
+                    this.settings.stackUpdateCheckIntervalHours = 6;
                 }
                 this.settingsLoaded = true;
             });
@@ -177,10 +171,11 @@ export default {
                     msg: this.$t("dataRetentionTimeError"),
                 };
             }
-            if (this.settings.stackUpdateCheckEnabled && !/^([01]\d|2[0-3]):[0-5]\d$/.test(this.settings.stackUpdateCheckTime || "")) {
+            const intervalHours = Number(this.settings.stackUpdateCheckIntervalHours);
+            if (this.settings.stackUpdateCheckEnabled && (!Number.isInteger(intervalHours) || intervalHours < 1 || intervalHours > 168)) {
                 return {
                     success: false,
-                    msg: this.$t("Invalid scheduled update check time"),
+                    msg: this.$t("Invalid update check interval"),
                 };
             }
             return {

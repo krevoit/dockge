@@ -69,38 +69,20 @@
                 </div>
 
                 <div class="row g-3">
-                    <div class="col-lg-4">
-                        <label class="form-label" for="stackUpdateCheckFrequency">
-                            {{ $t("Frequency") }}
+                    <div class="col-sm-6 col-lg-4">
+                        <label class="form-label" for="stackUpdateCheckIntervalHours">
+                            {{ $t("Check interval (hours)") }}
                         </label>
-                        <select id="stackUpdateCheckFrequency" v-model="settings.stackUpdateCheckFrequency" class="form-select" :disabled="!settings.stackUpdateCheckEnabled">
-                            <option value="daily">{{ $t("Daily") }}</option>
-                            <option value="weekly">{{ $t("Weekly") }}</option>
-                            <option value="fortnightly">{{ $t("Fortnightly") }}</option>
-                        </select>
-                    </div>
-
-                    <div class="col-lg-4">
-                        <label class="form-label" for="stackUpdateCheckTime">
-                            {{ $t("Scheduled Time") }}
-                        </label>
-                        <input id="stackUpdateCheckTime" v-model="settings.stackUpdateCheckTime" class="form-control" type="time" :disabled="!settings.stackUpdateCheckEnabled" />
-                    </div>
-
-                    <div class="col-lg-4">
-                        <label class="form-label" for="stackUpdateCheckTimezone">
-                            {{ $t("Timezone") }}
-                        </label>
-                        <select id="stackUpdateCheckTimezone" v-model="settings.stackUpdateCheckTimezone" class="form-select" :disabled="!settings.stackUpdateCheckEnabled">
-                            <option value="UTC">UTC</option>
-                            <option
-                                v-for="(timezone, index) in timezoneList"
-                                :key="index"
-                                :value="timezone.value"
-                            >
-                                {{ timezone.name }}
-                            </option>
-                        </select>
+                        <input
+                            id="stackUpdateCheckIntervalHours"
+                            v-model.number="settings.stackUpdateCheckIntervalHours"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                            max="168"
+                            step="1"
+                            :disabled="!settings.stackUpdateCheckEnabled"
+                        />
                     </div>
                 </div>
 

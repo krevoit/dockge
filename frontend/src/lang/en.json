@@ -114,6 +114,8 @@
     "Local Docker image was not found": "Local Docker image was not found",
     "Stack Image Update Checks": "Stack Image Update Checks",
     "Enable scheduled stack image update checks": "Enable scheduled stack image update checks",
+    "Check interval (hours)": "Check interval (hours)",
+    "Invalid update check interval": "Update check interval must be between 1 and 168 hours",
     "Frequency": "Frequency",
     "Daily": "Daily",
     "Weekly": "Weekly",
