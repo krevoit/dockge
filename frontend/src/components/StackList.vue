@@ -1,5 +1,5 @@
 <template>
-    <div class="shadow-box mb-3" :style="boxStyle">
+    <div class="stack-list-panel" :style="boxStyle">
         <div class="list-header">
             <div class="header-top">
                 <!-- TODO -->
@@ -20,9 +20,19 @@
                         <font-awesome-icon icon="times" />
                     </a>
                     <form>
-                        <input v-model="searchText" class="form-control search-input" autocomplete="off" />
+                        <input v-model="searchText" class="form-control search-input" :placeholder="$t('searchStacks')" autocomplete="off" />
                     </form>
                 </div>
+
+                <button
+                    class="updates-only-toggle"
+                    :class="{ active: updatesOnlyActive }"
+                    type="button"
+                    @click="toggleUpdatesOnly"
+                >
+                    {{ $t("updateAvailable") }}
+                    <span>{{ updateCount }}</span>
+                </button>
 
                 <div class="filter-wrapper">
                     <button
@@ -32,6 +42,7 @@
                         @click="filterDropdownOpen = !filterDropdownOpen"
                     >
                         <font-awesome-icon class="filter-icon" :class="{ 'filter-icon-active': filtersActive }" icon="filter" />
+                        <span>{{ $t("Filter") }}</span>
                     </button>
 
                     <div v-if="filterDropdownOpen" class="filter-dropdown">
@@ -67,6 +78,38 @@
                                 <span>{{ $t("Not managed by Dockge") }}</span>
                             </label>
                         </div>
+                    </div>
+                </div>
+
+                <div class="filter-wrapper">
+                    <button
+                        class="btn btn-link filter-icon-container"
+                        type="button"
+                        :title="$t('columns')"
+                        @click="columnDropdownOpen = !columnDropdownOpen"
+                    >
+                        <font-awesome-icon icon="stream" />
+                        <span>{{ $t("columns") }}</span>
+                    </button>
+
+                    <div v-if="columnDropdownOpen" class="filter-dropdown column-dropdown">
+                        <div class="filter-heading px-3 py-1">{{ $t("visibleColumns") }}</div>
+                        <label class="filter-option px-3">
+                            <input class="form-check-input" type="checkbox" checked disabled />
+                            <span>{{ $t("stackName") }}</span>
+                        </label>
+                        <label class="filter-option px-3">
+                            <input v-model="visibleColumns.agent" class="form-check-input" type="checkbox" />
+                            <span>{{ $t("Agent") }}</span>
+                        </label>
+                        <label class="filter-option px-3">
+                            <input v-model="visibleColumns.status" class="form-check-input" type="checkbox" />
+                            <span>{{ $t("Status") }}</span>
+                        </label>
+                        <label class="filter-option px-3">
+                            <input v-model="visibleColumns.updates" class="form-check-input" type="checkbox" />
+                            <span>{{ $t("updates") }}</span>
+                        </label>
                     </div>
                 </div>
 
@@ -106,6 +149,12 @@
             </div>
 
             <div v-for="(agent, index) in agentStackList" :key="index" class="stack-list-inner">
+                <div v-if="index === 0" class="stack-table-head" :style="columnGridStyle">
+                    <span>{{ $t("stackName") }}</span>
+                    <span v-if="visibleColumns.agent">{{ $t("Agent") }}</span>
+                    <span v-if="visibleColumns.status">{{ $t("Status") }}</span>
+                    <span v-if="visibleColumns.updates">{{ $t("updates") }}</span>
+                </div>
                 <div
                     v-if="$root.agentCount > 1"
                     class="p-2 agent-select"
@@ -128,6 +177,10 @@
                     :isSelected="isSelected"
                     :select="select"
                     :deselect="deselect"
+                    :show-agent="visibleColumns.agent"
+                    :show-status="visibleColumns.status"
+                    :show-updates="visibleColumns.updates"
+                    :grid-style="columnGridStyle"
                 />
             </div>
         </div>
@@ -158,6 +211,12 @@ export default {
             selectedStacks: {},
             windowTop: 0,
             filterDropdownOpen: false,
+            columnDropdownOpen: false,
+            visibleColumns: {
+                agent: false,
+                status: true,
+                updates: true,
+            },
             filterState: {
                 status: [],
                 agents: [],
@@ -170,9 +229,9 @@ export default {
     computed: {
         boxStyle() {
             if (window.innerWidth > 550) {
-                return { height: `calc(100vh - 160px + ${this.windowTop}px)` };
+                return { height: "calc(100vh - 148px)" };
             } else {
-                return { height: "calc(100vh - 160px)" };
+                return { height: "calc(100vh - 120px)" };
             }
         },
         /** Grouped stacks (PR #800 behavior), with filters + sort applied */
@@ -296,11 +355,24 @@ export default {
             return document.body.classList.contains("dark");
         },
         stackListStyle() {
-            let listHeaderHeight = 60;
+            let listHeaderHeight = 96;
             if (this.selectMode) {
                 listHeaderHeight += 42;
             }
             return { height: `calc(100% - ${listHeaderHeight}px)` };
+        },
+        columnGridStyle() {
+            const columns = [ "minmax(100px, 1fr)" ];
+            if (this.visibleColumns.agent) {
+                columns.push("minmax(62px, .7fr)");
+            }
+            if (this.visibleColumns.status) {
+                columns.push("68px");
+            }
+            if (this.visibleColumns.updates) {
+                columns.push("34px");
+            }
+            return { gridTemplateColumns: columns.join(" ") };
         },
         selectedStackCount() {
             return Object.keys(this.selectedStacks).length;
@@ -311,13 +383,24 @@ export default {
                    this.filterState.attributes.length > 0 ||
                    this.searchText !== "";
         },
+        updatesOnlyActive() {
+            return this.filterState.attributes.includes("hasUpdates");
+        },
+        updateCount() {
+            return Object.values(this.$root.completeStackList).filter(stack => stack.hasUpdates).length;
+        },
         statusFilterOptions() {
             return [
-                { value: RUNNING, label: "active" },
-                { value: EXITED, label: "exited" },
-                { value: CREATED_STACK, label: "created_stack" },
-                { value: CREATED_FILE, label: "inactive" },
-                { value: UNKNOWN, label: "unknown" },
+                { value: RUNNING,
+                    label: "active" },
+                { value: EXITED,
+                    label: "exited" },
+                { value: CREATED_STACK,
+                    label: "created_stack" },
+                { value: CREATED_FILE,
+                    label: "inactive" },
+                { value: UNKNOWN,
+                    label: "unknown" },
             ];
         },
         agentFilterOptions() {
@@ -344,6 +427,12 @@ export default {
         },
     },
     watch: {
+        visibleColumns: {
+            deep: true,
+            handler(value) {
+                window.localStorage.setItem("stackListColumns", JSON.stringify(value));
+            },
+        },
         searchText() {
             for (let stack of this.flatStackList) {
                 if (!this.selectedStacks[stack.id]) {
@@ -375,12 +464,30 @@ export default {
         },
     },
     mounted() {
+        const savedColumns = window.localStorage.getItem("stackListColumns");
+        if (savedColumns) {
+            try {
+                this.visibleColumns = { ...this.visibleColumns,
+                    ...JSON.parse(savedColumns) };
+            } catch {
+                window.localStorage.removeItem("stackListColumns");
+            }
+        }
         window.addEventListener("scroll", this.onScroll);
     },
     beforeUnmount() {
         window.removeEventListener("scroll", this.onScroll);
     },
     methods: {
+        toggleUpdatesOnly() {
+            const attributes = this.filterState.attributes;
+            const index = attributes.indexOf("hasUpdates");
+            if (index >= 0) {
+                attributes.splice(index, 1);
+            } else {
+                attributes.push("hasUpdates");
+            }
+        },
         onScroll() {
             if (window.top.scrollY <= 133) {
                 this.windowTop = window.top.scrollY;
@@ -443,10 +550,8 @@ export default {
 <style lang="scss" scoped>
 @import "../styles/vars.scss";
 
-.shadow-box {
-    height: calc(100vh - 150px);
-    position: sticky;
-    top: 10px;
+.stack-list-panel {
+    min-height: 0;
 }
 
 .small-padding {
@@ -455,22 +560,23 @@ export default {
 }
 
 .list-header {
-    border-bottom: 1px solid #dee2e6;
-    border-radius: 10px 10px 0 0;
-    margin: -10px;
-    margin-bottom: 10px;
-    padding: 10px;
+    border-bottom: 1px solid #35332e;
+    margin-bottom: 0;
+    padding-bottom: 12px;
 
     .dark & {
-        background-color: $dark-header-bg;
-        border-bottom: 0;
+        background: transparent;
+        border-bottom-color: $dark-border-color;
     }
 }
 
 .header-top {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .placeholder { display: none; }
 }
 
 .header-filter {
@@ -488,11 +594,19 @@ export default {
 
 .search-wrapper {
     display: flex;
+    flex: 1;
     align-items: center;
+    min-width: 0;
+    position: relative;
+
+    form { width: 100%; }
 }
 
 .search-icon {
-    padding: 10px;
+    left: 0;
+    padding: 9px 10px;
+    position: absolute;
+    z-index: 1;
     color: #c0c0c0;
 
     // Clear filter button (X)
@@ -507,7 +621,9 @@ export default {
 }
 
 .search-input {
-    max-width: 10em;
+    max-width: none;
+    padding-left: 34px;
+    width: 100%;
 }
 
 .filter-wrapper {
@@ -515,9 +631,48 @@ export default {
 }
 
 .filter-icon-container {
-    color: $dark-font-color3;
-    padding: 6px 8px;
+    align-items: center;
+    border: 1px solid #3b3832;
+    color: #b7b0a6;
+    display: flex;
+    gap: 7px;
+    min-height: 34px;
+    padding: 5px 10px;
     text-decoration: none;
+
+    .dark & { border-color: $dark-border-color; }
+}
+
+.updates-only-toggle {
+    align-items: center;
+    background: #1c1b18;
+    border: 1px solid #3b3832;
+    border-radius: 7px;
+    color: #b9b2a8;
+    display: flex;
+    font-size: 11px;
+    gap: 7px;
+    min-height: 34px;
+    padding: 0 10px;
+
+    span {
+        align-items: center;
+        background: #302c25;
+        border-radius: 10px;
+        color: #d9a35b;
+        display: inline-flex;
+        font-size: 10px;
+        height: 18px;
+        justify-content: center;
+        min-width: 18px;
+        padding: 0 5px;
+    }
+
+    &.active {
+        background: rgba($primary, 0.12);
+        border-color: rgba($primary, 0.65);
+        color: #e7a366;
+    }
 }
 
 .filter-icon {
@@ -530,9 +685,9 @@ export default {
 }
 
 .filter-dropdown {
-    background: $dark-bg;
+    background: #201f1b;
     border: 1px solid $dark-border-color;
-    border-radius: 8px;
+    border-radius: 9px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
     color: $dark-font-color;
     min-width: 230px;
@@ -542,6 +697,8 @@ export default {
     top: 100%;
     z-index: 10;
 }
+
+.column-dropdown { min-width: 190px; }
 
 .filter-dropdown-clear {
     background: transparent;
@@ -604,14 +761,44 @@ export default {
 }
 
 .agent-select {
+    border-bottom: 1px solid #302e29;
+    border-top: 1px solid #302e29;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    color: $dark-font-color3;
-    padding-left: 10px;
-    padding-right: 10px;
+    font-size: 11px;
+    font-weight: 620;
+    color: #aaa39a;
+    min-height: 37px;
+    padding: 8px 10px !important;
     display: flex;
     align-items: center;
     user-select: none;
+}
+
+.update-all-wrapper {
+    display: none;
+
+    .btn {
+        background: transparent;
+        border: 0;
+        color: $primary;
+        min-height: 34px;
+        padding: 0 4px;
+        white-space: nowrap;
+
+        &:hover { color: lighten($primary, 8%); }
+    }
+}
+
+.stack-list {
+    padding-right: 0;
+}
+
+.stack-table-head {
+    color: #8b857b;
+    display: grid;
+    font-size: 9px;
+    gap: 8px;
+    padding: 10px 8px 8px 12px;
+    text-transform: uppercase;
 }
 </style>

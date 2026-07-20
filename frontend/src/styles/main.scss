@@ -3,19 +3,30 @@
 @import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
 
 #app {
-    font-family: BlinkMacSystemFont, segoe ui, Roboto, helvetica neue, Arial, noto sans, sans-serif, apple color emoji, segoe ui emoji, segoe ui symbol, noto color emoji;
+    min-height: 100vh;
+    font-family: Inter, "Avenir Next", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
 h1 {
-    font-size: 32px;
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.025em;
 }
 
 h2 {
-    font-size: 26px;
+    font-size: 18px;
+    font-weight: 620;
+    letter-spacing: -0.015em;
+}
+
+h3, h4, h5 {
+    font-weight: 620;
+    letter-spacing: -0.01em;
 }
 
 textarea.form-control {
-    border-radius: 19px;
+    border-radius: 5px;
 }
 
 ::-webkit-scrollbar {
@@ -85,8 +96,8 @@ optgroup {
 }
 
 .modal-content {
-    border-radius: 1rem;
-    box-shadow: 0 15px 70px rgba(0, 0, 0, 0.1);
+    border-radius: 7px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
 
     .dark & {
         box-shadow: 0 15px 70px rgb(0 0 0);
@@ -100,9 +111,10 @@ optgroup {
 }
 
 .shadow-box {
-    box-shadow: 0 15px 70px rgba(0, 0, 0, 0.1);
+    border: 1px solid #d9dce1;
+    box-shadow: none;
     padding: 10px;
-    border-radius: 10px;
+    border-radius: 6px;
 
     &.big-padding {
         padding: 20px;
@@ -110,17 +122,23 @@ optgroup {
 }
 
 .btn {
-    padding-left: 20px;
-    padding-right: 20px;
+    min-height: 34px;
+    padding: 0.38rem 0.7rem;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 580;
+    box-shadow: none !important;
 }
 
 .btn-sm {
-    border-radius: 25px;
+    min-height: 30px;
+    border-radius: 4px;
 }
 
 .btn-primary {
     color: white;
-    background: $primary-gradient;
+    background: $primary;
+    border-color: $primary;
 
     &:hover, &:active, &:focus, &.active {
         color: white;
@@ -134,7 +152,7 @@ optgroup {
 }
 
 .btn-normal {
-    $bg-color: #F5F5F5;
+    $bg-color: #eceef1;
 
     background-color: $bg-color;
     border-color: $bg-color;
@@ -144,6 +162,54 @@ optgroup {
         background-color: $hover-color;
         border-color: $hover-color;
     }
+}
+
+.form-control,
+.form-select {
+    min-height: 34px;
+    border-color: #cfd3d8;
+    border-radius: 7px;
+    font-size: 12px;
+
+    &:focus {
+        border-color: $primary;
+        box-shadow: 0 0 0 2px rgba($primary, 0.2);
+    }
+}
+
+.dark {
+    background: $dark-bg2;
+    color: $dark-font-color;
+
+    .form-control,
+    .form-select {
+        background-color: #141411;
+        border-color: $dark-border-color;
+        color: $dark-font-color;
+    }
+
+    .btn-normal,
+    .btn-secondary {
+        background: #1d1c19;
+        border-color: #3b3832;
+        color: $dark-font-color;
+
+        &:hover {
+            background: #292620;
+            border-color: #565047;
+        }
+    }
+}
+
+.form-label {
+    color: #666d76;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge {
+    border-radius: 4px;
+    font-weight: 560;
 }
 
 .btn-warning {
@@ -235,7 +301,7 @@ optgroup {
 
 // Dark Theme override here
 .dark {
-    background-color: #090c10;
+    background-color: $dark-bg2;
     color: $dark-font-color;
 
     mark, .mark {
@@ -249,6 +315,7 @@ optgroup {
     .shadow-box {
         &:not(.alert) {
             background-color: $dark-bg;
+            border-color: $dark-border-color;
         }
     }
 
@@ -258,7 +325,7 @@ optgroup {
     }
 
     .input-group-text {
-        background-color: #282f39;
+        background-color: #24221e;
         border-color: $dark-border-color;
         color: $dark-font-color;
     }
@@ -268,7 +335,7 @@ optgroup {
     }
 
     .form-switch .form-check-input {
-        background-color: #232f3b;
+        background-color: #292620;
     }
 
     a:not(.btn),
@@ -291,7 +358,7 @@ optgroup {
     .form-select,
     .form-select:focus {
         color: $dark-font-color;
-        background-color: $dark-bg2;
+        background-color: #121210;
     }
 
     .form-select:disabled {
@@ -301,15 +368,20 @@ optgroup {
 
     .form-control, .form-select {
         border-color: $dark-border-color;
+
+        &:focus {
+            border-color: $primary;
+            box-shadow: 0 0 0 2px rgba($primary, 0.2);
+        }
     }
 
     .form-control:disabled, .form-control[readonly] {
-        background-color: #232f3b;
+        background-color: #24221e;
         opacity: 1;
     }
 
     .table-hover > tbody > tr:hover > * {
-        --bs-table-accent-bg: #070a10;
+        --bs-table-accent-bg: #171511;
         color: $dark-font-color;
     }
 
@@ -332,7 +404,7 @@ optgroup {
     }
 
     .btn-normal {
-        $bg-color: $dark-header-bg;
+        $bg-color: #24221e;
 
         color: $dark-font-color;
         background-color: $bg-color;

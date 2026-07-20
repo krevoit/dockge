@@ -1,19 +1,21 @@
 <template>
     <transition name="slide-fade" appear>
         <div>
-            <h1 v-if="isAdd" class="mb-3">{{ $t("compose") }}</h1>
-            <h1 v-else class="mb-3">
-                <Uptime :stack="globalStack" :pill="true" /> {{ stack.name }}
-                <span v-if="globalStack?.hasUpdates" class="stack-update-indicator" :title="stackUpdateTitle">
-                    <font-awesome-icon icon="cloud-arrow-down" />
-                </span>
-                <span v-if="$root.agentCount > 1 && endpoint !== ''" class="agent-name">
-                    ({{ endpointDisplay }})
-                </span>
-            </h1>
+            <header class="stack-detail-header">
+                <div class="stack-identity">
+                    <h1 v-if="isAdd">{{ $t("compose") }}</h1>
+                    <h1 v-else>{{ stack.name }}</h1>
+                    <Uptime v-if="!isAdd" :stack="globalStack" :pill="true" />
+                    <span v-if="globalStack?.hasUpdates" class="stack-update-indicator" :title="stackUpdateTitle">
+                        {{ globalStack.updateServices?.length || 1 }} {{ $t("updates") }}
+                    </span>
+                    <span v-if="$root.agentCount > 1 && endpoint !== ''" class="agent-name">
+                        {{ endpointDisplay }}
+                    </span>
+                    <small v-if="!isAdd">/opt/stacks/{{ stack.name }}/{{ stack.composeFileName || 'compose.yaml' }}</small>
+                </div>
 
-            <div v-if="stack.isManagedByDockge" class="mb-3">
-                <div class="btn-group me-2" role="group">
+                <div v-if="stack.isManagedByDockge" class="stack-actions">
                     <button v-if="isEditMode" class="btn btn-primary" :disabled="processing" @click="deployStack">
                         <font-awesome-icon icon="rocket" class="me-1" />
                         {{ $t("deployStack") }}
@@ -34,12 +36,12 @@
                         {{ $t("startStack") }}
                     </button>
 
-                    <button v-if="!isEditMode && active" class="btn btn-normal " :disabled="processing" @click="restartStack">
+                    <button v-if="!isEditMode && active" class="btn btn-normal" :disabled="processing" @click="restartStack">
                         <font-awesome-icon icon="rotate" class="me-1" />
                         {{ $t("restartStack") }}
                     </button>
 
-                    <button v-if="!isEditMode" class="btn btn-normal" :disabled="processing" @click="updateStack">
+                    <button v-if="!isEditMode" class="btn btn-primary" :disabled="processing" @click="updateStack">
                         <font-awesome-icon icon="cloud-arrow-down" class="me-1" />
                         {{ $t("updateStack") }}
                     </button>
@@ -50,23 +52,23 @@
                     </button>
 
                     <BDropdown right text="" variant="normal">
+                        <BDropdownItem @click="showServices = !showServices">
+                            <font-awesome-icon icon="clone" class="me-1" /> {{ $tc("container", 2) }}
+                        </BDropdownItem>
                         <BDropdownItem @click="downStack">
                             <font-awesome-icon icon="stop" class="me-1" />
                             {{ $t("downStack") }}
                         </BDropdownItem>
+                        <BDropdownItem v-if="!isEditMode && !errorDelete" @click="showDeleteDialog = !showDeleteDialog">
+                            <font-awesome-icon icon="trash" class="me-1" /> {{ $t("deleteStack") }}
+                        </BDropdownItem>
+                        <BDropdownItem v-if="errorDelete" @click="showForceDeleteDialog = !showForceDeleteDialog">
+                            <font-awesome-icon icon="trash" class="me-1" /> {{ $t("forceDeleteStack") }}
+                        </BDropdownItem>
                     </BDropdown>
+                    <button v-if="isEditMode && !isAdd" class="btn btn-normal" :disabled="processing" @click="discardStack">{{ $t("discardStack") }}</button>
                 </div>
-
-                <button v-if="isEditMode && !isAdd" class="btn btn-normal" :disabled="processing" @click="discardStack">{{ $t("discardStack") }}</button>
-                <button v-if="!isEditMode && !errorDelete" class="btn btn-danger" :disabled="processing" @click="showDeleteDialog = !showDeleteDialog">
-                    <font-awesome-icon icon="trash" class="me-1" />
-                    {{ $t("deleteStack") }}
-                </button>
-                <button v-if="errorDelete" class="btn btn-danger" :disabled="processing" @click="showForceDeleteDialog = !showForceDeleteDialog">
-                    <font-awesome-icon icon="trash" class="me-1" />
-                    {{ $t("forceDeleteStack") }}
-                </button>
-            </div>
+            </header>
 
             <!-- URLs -->
             <div v-if="urls.length > 0" class="mb-3">
@@ -88,8 +90,8 @@
                 ></Terminal>
             </transition>
 
-            <div v-if="stack.isManagedByDockge" class="row">
-                <div class="col-lg-6">
+            <div v-if="stack.isManagedByDockge" class="stack-content-layout">
+                <section v-show="showServices || isAdd" class="services-section">
                     <!-- General -->
                     <div v-if="isAdd">
                         <h4 class="mb-3">{{ $t("general") }}</h4>
@@ -159,60 +161,86 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Combined Terminal Output -->
-                    <div v-show="!isEditMode">
-                        <h4 class="mb-3">{{ $t("terminal") }}</h4>
-                        <Terminal
-                            ref="combinedTerminal"
-                            class="mb-3 terminal"
-                            :name="combinedTerminalName"
-                            :endpoint="endpoint"
-                            :rows="combinedTerminalRows"
-                            :cols="combinedTerminalCols"
-                            style="height: 315px;"
-                        ></Terminal>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <!-- Override YAML editor (only show if file exists) -->
-                    <div v-if="stack.composeOverrideYAML && stack.composeOverrideYAML.trim() !== ''">
-                        <h4 class="mb-3">{{ stack.composeOverrideFileName || 'compose.override.yaml' }}</h4>
-                        <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                            <button v-if="isEditMode" v-b-modal.compose-override-editor-modal class="expand-button">
-                                <font-awesome-icon icon="expand" />
+                </section>
+                <section class="configuration-shell">
+                    <div class="configuration-heading">
+                        <h2>Configuration</h2>
+                        <div class="configuration-state">
+                            <span v-if="!isEditMode"><font-awesome-icon icon="check" /> Saved</span>
+                            <button v-if="!isEditMode" class="btn btn-normal" @click="enableEditMode">
+                                <font-awesome-icon icon="pen" class="me-1" /> {{ $t("editStack") }}
                             </button>
-                            <code-mirror
-                                ref="overrideEditor"
-                                v-model="stack.composeOverrideYAML"
-                                :extensions="extensions"
-                                minimal
-                                wrap="true"
-                                dark="true"
-                                tab="true"
-                                :disabled="!isEditMode"
-                                :hasFocus="editorFocus"
-                                @change="yamlCodeChange"
-                            />
+                            <button v-else class="btn btn-primary" :disabled="processing" @click="deployStack">
+                                <font-awesome-icon icon="save" class="me-1" /> Apply changes
+                            </button>
                         </div>
-                        <div v-if="isEditMode" class="mb-3">
-                            {{ yamlError }}
-                        </div>
+                    </div>
+                    <div class="configuration-grid">
+                        <div class="compose-pane">
+                            <!-- Override YAML editor (only show if file exists) -->
+                            <div v-if="stack.composeOverrideYAML && stack.composeOverrideYAML.trim() !== ''">
+                                <h4 class="mb-3">{{ stack.composeOverrideFileName || 'compose.override.yaml' }}</h4>
+                                <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                    <button v-if="isEditMode" v-b-modal.compose-override-editor-modal class="expand-button">
+                                        <font-awesome-icon icon="expand" />
+                                    </button>
+                                    <code-mirror
+                                        ref="overrideEditor"
+                                        v-model="stack.composeOverrideYAML"
+                                        :extensions="extensions"
+                                        minimal
+                                        wrap
+                                        dark
+                                        tab
+                                        :disabled="!isEditMode"
+                                        :hasFocus="editorFocus"
+                                        @change="yamlCodeChange"
+                                    />
+                                </div>
+                                <div v-if="isEditMode" class="mb-3">
+                                    {{ yamlError }}
+                                </div>
 
-                        <!-- Override modal fullscreen editor (CodeMirror) -->
-                        <BModal
-                            id="compose-override-editor-modal" :title="stack.composeOverrideFileName || 'compose.override.yaml'"
-                            scrollable size="fullscreen" hide-footer
-                        >
+                                <!-- Override modal fullscreen editor (CodeMirror) -->
+                                <BModal
+                                    id="compose-override-editor-modal" :title="stack.composeOverrideFileName || 'compose.override.yaml'"
+                                    scrollable size="fullscreen" hide-footer
+                                >
+                                    <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                        <code-mirror
+                                            ref="editor"
+                                            v-model="stack.composeOverrideYAML"
+                                            :extensions="extensions"
+                                            minimal
+                                            wrap
+                                            dark
+                                            tab
+                                            :disabled="!isEditMode"
+                                            :hasFocus="editorFocus"
+                                            @change="yamlCodeChange"
+                                        />
+                                    </div>
+                                    <div v-if="isEditMode" class="mb-3">
+                                        {{ yamlError }}
+                                    </div>
+                                </BModal>
+                            </div>
+
+                            <h3 class="pane-title">Compose YAML <span>{{ stack.composeFileName }}</span></h3>
+
+                            <!-- YAML editor -->
                             <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                <button v-if="isEditMode" v-b-modal.compose-editor-modal class="expand-button">
+                                    <font-awesome-icon icon="expand" />
+                                </button>
                                 <code-mirror
                                     ref="editor"
-                                    v-model="stack.composeOverrideYAML"
+                                    v-model="stack.composeYAML"
                                     :extensions="extensions"
                                     minimal
-                                    wrap="true"
-                                    dark="true"
-                                    tab="true"
+                                    wrap
+                                    dark
+                                    tab
                                     :disabled="!isEditMode"
                                     :hasFocus="editorFocus"
                                     @change="yamlCodeChange"
@@ -221,93 +249,69 @@
                             <div v-if="isEditMode" class="mb-3">
                                 {{ yamlError }}
                             </div>
-                        </BModal>
-                    </div>
 
-                    <h4 class="mb-3">{{ stack.composeFileName }}</h4>
-
-                    <!-- YAML editor -->
-                    <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                        <button v-if="isEditMode" v-b-modal.compose-editor-modal class="expand-button">
-                            <font-awesome-icon icon="expand" />
-                        </button>
-                        <code-mirror
-                            ref="editor"
-                            v-model="stack.composeYAML"
-                            :extensions="extensions"
-                            minimal
-                            wrap="true"
-                            dark="true"
-                            tab="true"
-                            :disabled="!isEditMode"
-                            :hasFocus="editorFocus"
-                            @change="yamlCodeChange"
-                        />
-                    </div>
-                    <div v-if="isEditMode" class="mb-3">
-                        {{ yamlError }}
-                    </div>
-
-                    <!-- YAML modal fullscreen editor (CodeMirror) -->
-                    <BModal id="compose-editor-modal" :title="stack.composeFileName" scrollable size="fullscreen" hide-footer>
-                        <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                            <code-mirror
-                                ref="editor"
-                                v-model="stack.composeYAML"
-                                :extensions="extensions"
-                                minimal
-                                wrap="true"
-                                dark="true"
-                                tab="true"
-                                :disabled="!isEditMode"
-                                :hasFocus="editorFocus"
-                                @change="yamlCodeChange"
-                            />
+                            <!-- YAML modal fullscreen editor (CodeMirror) -->
+                            <BModal id="compose-editor-modal" :title="stack.composeFileName" scrollable size="fullscreen" hide-footer>
+                                <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                    <code-mirror
+                                        ref="editor"
+                                        v-model="stack.composeYAML"
+                                        :extensions="extensions"
+                                        minimal
+                                        wrap
+                                        dark
+                                        tab
+                                        :disabled="!isEditMode"
+                                        :hasFocus="editorFocus"
+                                        @change="yamlCodeChange"
+                                    />
+                                </div>
+                                <div v-if="isEditMode" class="mb-3">
+                                    {{ yamlError }}
+                                </div>
+                            </BModal>
                         </div>
-                        <div v-if="isEditMode" class="mb-3">
-                            {{ yamlError }}
-                        </div>
-                    </BModal>
+                        <div class="environment-pane">
+                            <!-- ENV editor -->
+                            <div>
+                                <h3 class="pane-title">Environment <span>.env</span></h3>
+                                <div class="environment-table">
+                                    <div class="environment-table-head"><span>Key</span><span>Value</span></div>
+                                    <div v-for="entry in envEntries" :key="entry.lineIndex" class="environment-row">
+                                        <code>{{ entry.key }}</code>
+                                        <input
+                                            v-if="isEditMode"
+                                            :value="entry.value"
+                                            type="text"
+                                            @input="updateEnvEntry(entry, $event.target.value)"
+                                        />
+                                        <span v-else>{{ entry.maskedValue }}</span>
+                                    </div>
+                                    <button v-if="isEditMode" v-b-modal.env-editor-modal class="raw-env-button" type="button">
+                                        <font-awesome-icon icon="expand" /> Edit raw .env
+                                    </button>
+                                </div>
+                            </div>
 
-                    <!-- ENV editor -->
-                    <div v-if="isEditMode">
-                        <h4 class="mb-3">.env</h4>
-                        <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                            <button v-if="isEditMode" v-b-modal.env-editor-modal class="expand-button">
-                                <font-awesome-icon icon="expand" />
-                            </button>
-                            <code-mirror
-                                ref="editor"
-                                v-model="stack.composeENV"
-                                :extensions="extensionsEnv"
-                                minimal
-                                wrap="true"
-                                dark="true"
-                                tab="true"
-                                :disabled="!isEditMode"
-                                :hasFocus="editorFocus"
-                                @change="yamlCodeChange"
-                            />
+                            <!-- ENV modal fullscreen editor (CodeMirror) -->
+                            <BModal id="env-editor-modal" title=".env" scrollable size="fullscreen" hide-footer>
+                                <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
+                                    <code-mirror
+                                        ref="editor"
+                                        v-model="stack.composeENV"
+                                        :extensions="extensionsEnv"
+                                        minimal
+                                        wrap
+                                        dark
+                                        tab
+                                        :disabled="!isEditMode"
+                                        :hasFocus="editorFocus"
+                                        @change="yamlCodeChange"
+                                    />
+                                </div>
+                            </BModal>
                         </div>
                     </div>
-
-                    <!-- ENV modal fullscreen editor (CodeMirror) -->
-                    <BModal id="env-editor-modal" title=".env" scrollable size="fullscreen" hide-footer>
-                        <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
-                            <code-mirror
-                                ref="editor"
-                                v-model="stack.composeENV"
-                                :extensions="extensionsEnv"
-                                minimal
-                                wrap="true"
-                                dark="true"
-                                tab="true"
-                                :disabled="!isEditMode"
-                                :hasFocus="editorFocus"
-                                @change="yamlCodeChange"
-                            />
-                        </div>
-                    </BModal>
 
                     <div v-if="isEditMode">
                         <!-- Volumes -->
@@ -330,7 +334,22 @@
                             <input id="name" v-model="name" type="text" class="form-control" placeholder="Search..." required>
                         </div>
                     </div>-->
-                </div>
+                </section>
+
+                <section v-show="!isEditMode && !isAdd" class="deploy-log-shell">
+                    <div class="deploy-log-heading">
+                        <h2>Deploy log</h2>
+                        <span><font-awesome-icon icon="check-circle" /> Live output</span>
+                    </div>
+                    <Terminal
+                        ref="combinedTerminal"
+                        class="terminal"
+                        :name="combinedTerminalName"
+                        :endpoint="endpoint"
+                        :rows="combinedTerminalRows"
+                        :cols="combinedTerminalCols"
+                    ></Terminal>
+                </section>
             </div>
 
             <div v-if="!stack.isManagedByDockge && !processing">
@@ -495,6 +514,7 @@ export default {
             deleteStackFiles: false,
             showForceDeleteDialog: false,
             newContainerName: "",
+            showServices: false,
             stopServiceStatusTimeout: false,
             stopDockerStatsTimeout: false,
         };
@@ -579,6 +599,27 @@ export default {
 
         endpoint() {
             return this.stack.endpoint || this.$route.params.endpoint || "";
+        },
+
+        envEntries() {
+            return (this.stack.composeENV || "")
+                .split(/\r?\n/)
+                .map((line, lineIndex) => {
+                    const separator = line.indexOf("=");
+                    if (separator <= 0 || line.trim().startsWith("#")) {
+                        return null;
+                    }
+                    const key = line.slice(0, separator).trim();
+                    const value = line.slice(separator + 1);
+                    const sensitive = /(password|secret|token|key)/i.test(key);
+                    return {
+                        key,
+                        value,
+                        lineIndex,
+                        maskedValue: sensitive ? "••••••••••••" : value,
+                    };
+                })
+                .filter(Boolean);
         },
 
         url() {
@@ -687,6 +728,11 @@ export default {
 
     },
     methods: {
+        updateEnvEntry(entry, value) {
+            const lines = (this.stack.composeENV || "").split(/\r?\n/);
+            lines[entry.lineIndex] = `${entry.key}=${value}`;
+            this.stack.composeENV = lines.join("\n");
+        },
         startServiceStatusTimeout() {
             clearTimeout(serviceStatusTimeout);
             serviceStatusTimeout = setTimeout(async () => {
@@ -1031,22 +1077,244 @@ export default {
 <style scoped lang="scss">
 @import "../styles/vars.scss";
 
-.terminal {
-    height: 200px;
+.stack-detail-header {
+    align-items: center;
+    background: #1a1916;
+    border: 1px solid #35332e;
+    border-radius: 11px;
+    display: flex;
+    gap: 18px;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    min-height: 82px;
+    padding: 13px 16px;
+}
+
+.stack-identity {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+
+    h1 {
+        color: #ece6dc;
+        font-size: 20px;
+        line-height: 1;
+        margin: 0 4px 0 0;
+    }
+
+    small {
+        color: #777169;
+        flex-basis: 100%;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.stack-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+
+    :deep(.btn-group) { gap: 8px; }
+}
+
+.stack-content-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.configuration-shell,
+.deploy-log-shell,
+.services-section {
+    background: #1a1916;
+    border: 1px solid #35332e;
+    border-radius: 11px;
+    overflow: hidden;
+}
+
+.configuration-shell { order: 1; }
+.deploy-log-shell { order: 2; }
+.services-section { order: 3; padding: 16px; }
+
+.configuration-heading,
+.deploy-log-heading {
+    align-items: center;
+    border-bottom: 1px solid #35332e;
+    display: flex;
+    justify-content: space-between;
+    min-height: 54px;
+    padding: 9px 14px;
+
+    h2 {
+        color: #e4ded5;
+        font-size: 15px;
+        margin: 0;
+    }
+}
+
+.configuration-state {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+
+    > span {
+        color: #72bd8e;
+        font-size: 11px;
+    }
+}
+
+.configuration-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr);
+}
+
+.compose-pane,
+.environment-pane {
+    background: #121210;
+    min-width: 0;
+}
+
+.compose-pane { border-right: 1px solid #35332e; }
+
+.pane-title {
+    align-items: center;
+    background: #1c1b18;
+    border-bottom: 1px solid #35332e;
+    color: #ddd6cc;
+    display: flex;
+    font-size: 12px;
+    font-weight: 650;
+    justify-content: space-between;
+    margin: 0;
+    min-height: 43px;
+    padding: 9px 12px;
+
+    span {
+        color: #777169;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 9px;
+        font-weight: 400;
+    }
+}
+
+.environment-table {
+    background: #121210;
+    height: 390px;
+    overflow: auto;
+}
+
+.environment-table-head,
+.environment-row {
+    align-items: center;
+    border-bottom: 1px solid #302e29;
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) minmax(120px, 1.25fr);
+    min-height: 42px;
+    padding: 0 11px;
+}
+
+.environment-table-head {
+    color: #777169;
+    font-size: 9px;
+    min-height: 36px;
+    text-transform: uppercase;
+}
+
+.environment-row {
+    color: #c5beb4;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    gap: 9px;
+
+    code {
+        color: #cfc8bd;
+        font-size: inherit;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    input {
+        background: #191815;
+        border: 1px solid #3a3731;
+        border-radius: 5px;
+        color: #d4cdc3;
+        font-family: inherit;
+        font-size: inherit;
+        min-height: 29px;
+        padding: 4px 7px;
+        width: 100%;
+    }
+}
+
+.raw-env-button {
+    background: transparent;
+    border: 0;
+    color: #a69f95;
+    font-size: 10px;
+    padding: 11px;
+}
+
+.terminal { height: 176px; }
+
+.deploy-log-heading {
+    min-height: 42px;
+    padding-block: 6px;
+
+    span {
+        color: #72bd8e;
+        font-size: 10px;
+    }
 }
 
 :deep(.cm-variable-highlight) {
-    color: #fe6000;
+    color: #d98745;
     font-weight: 600;
 }
 
 .editor-box {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
+    border: 0;
+    border-radius: 0;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    height: 390px;
+    margin: 0 !important;
+    padding: 0;
+
     &.edit-mode {
-        background-color: #2c2f38 !important;
+        background-color: #151410 !important;
     }
+
     position: relative;
+}
+
+:deep(.editor-box .cm-editor) {
+    background: #121210;
+    height: 390px;
+}
+
+:deep(.editor-box .cm-scroller) {
+    font-family: "JetBrains Mono", monospace;
+    line-height: 1.55;
+}
+
+:deep(.editor-box .cm-gutters) {
+    background: #151512;
+    border-right-color: #302e29;
+    color: #625f58;
 }
 
 .expand-button {
@@ -1067,15 +1335,45 @@ export default {
 }
 
 .agent-name {
-    font-size: 13px;
-    color: $dark-font-color3;
+    color: #8f887f;
+    font-size: 10px;
 }
 
 .stack-update-indicator {
-    color: $primary;
+    background: rgba($primary, 0.12);
+    border: 1px solid rgba($primary, 0.35);
+    border-radius: 5px;
+    color: #e39a5d;
     display: inline-flex;
-    font-size: 0.85rem;
-    margin-left: 0.35rem;
+    font-size: 9px;
+    padding: 3px 6px;
     vertical-align: middle;
+}
+
+@media (max-width: 1100px) {
+    .configuration-grid { grid-template-columns: 1fr; }
+    .compose-pane { border-bottom: 1px solid #35332e; border-right: 0; }
+    .editor-box,
+    :deep(.editor-box .cm-editor),
+    .environment-table { height: 310px; }
+}
+
+@media (min-width: 1101px) and (max-height: 800px) {
+    .editor-box,
+    :deep(.editor-box .cm-editor),
+    .environment-table { height: 230px; }
+
+    .terminal { height: 108px; }
+}
+
+@media (max-width: 767px) {
+    .stack-detail-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .stack-actions { justify-content: flex-start; }
+    .configuration-heading { align-items: flex-start; gap: 8px; }
+    .configuration-state { flex-wrap: wrap; justify-content: flex-end; }
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-    <span :class="className">{{ statusName }}</span>
+    <span :class="className" :title="statusName" :aria-label="statusName">{{ statusName }}</span>
 </template>
 
 <script>
@@ -44,13 +44,20 @@ export default {
 
 <style scoped>
 .badge {
-    min-width: 62px;
+    border-radius: 2px !important;
+    height: 9px;
+    min-width: 9px;
+    padding: 0;
+    width: 9px;
+    overflow: hidden;
+    text-indent: -999px;
+}
 
+.badge.bg-primary {
+    background-color: #6bc79b !important;
 }
 
 .fixed-width {
-    width: 62px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: 9px;
 }
 </style>

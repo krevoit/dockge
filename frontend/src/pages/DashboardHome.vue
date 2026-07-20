@@ -1,62 +1,61 @@
 <template>
     <transition ref="tableContainer" name="slide-fade" appear>
-        <div v-if="$route.name === 'DashboardHome'">
-            <h1 class="mb-3">
-                {{ $t("home") }}
-            </h1>
+        <div v-if="$route.name === 'DashboardHome'" class="overview-page">
+            <header class="overview-header">
+                <h1>{{ $t("overview") }}</h1>
+                <div class="status-summary" :aria-label="$t('Status')">
+                    <span class="running"><i></i>{{ $t("active") }} <strong>{{ activeNum }}</strong></span>
+                    <span class="exited"><i></i>{{ $t("exited") }} <strong>{{ exitedNum }}</strong></span>
+                    <span class="inactive"><i></i>{{ $t("inactive") }} <strong>{{ inactiveNum }}</strong></span>
+                </div>
+            </header>
 
-            <div class="row first-row">
-                <!-- Left -->
-                <div class="col-md-7">
-                    <!-- Stats -->
-                    <div class="shadow-box big-padding text-center mb-4">
-                        <div class="row">
-                            <div class="col">
-                                <h3>{{ $t("active") }}</h3>
-                                <span class="num active">{{ activeNum }}</span>
-                            </div>
-                            <div class="col">
-                                <h3>{{ $t("exited") }}</h3>
-                                <span class="num exited">{{ exitedNum }}</span>
-                            </div>
-                            <div class="col">
-                                <h3>{{ $t("inactive") }}</h3>
-                                <span class="num inactive">{{ inactiveNum }}</span>
-                            </div>
+            <div class="overview-grid">
+                <section class="converter-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2>{{ $t("dockerRunToCompose") }}</h2>
+                            <p>{{ $t("dockerRunDescription") }}</p>
                         </div>
                     </div>
 
-                    <!-- Docker Run -->
-                    <h2 class="mb-3">{{ $t("Docker Run") }}</h2>
-                    <div class="mb-3">
-                        <textarea id="name" v-model="dockerRunCommand" type="text" class="form-control docker-run shadow-box" required placeholder="docker run ..."></textarea>
+                    <div class="command-editor">
+                        <div class="editor-bar"><span>docker run command</span><span>Ln 1, Col 1</span></div>
+                        <div class="editor-body">
+                            <span class="line-number">1</span>
+                            <textarea id="docker-run" v-model="dockerRunCommand" type="text" class="docker-run" required placeholder="docker run ..."></textarea>
+                        </div>
                     </div>
 
-                    <button class="btn-normal btn mb-4" @click="convertDockerRun">{{ $t("Convert to Compose") }}</button>
-                </div>
-                <!-- Right -->
-                <div class="col-md-5">
-                    <!-- Agent List -->
-                    <div class="shadow-box big-padding">
-                        <h4 class="mb-3">{{ $tc("dockgeAgent", 2) }} <span class="badge bg-warning" style="font-size: 12px;">beta</span></h4>
+                    <p class="editor-help">{{ $t("dockerRunHelp") }}</p>
+                    <div class="converter-actions">
+                        <button class="btn btn-link" :disabled="!dockerRunCommand" @click="dockerRunCommand = ''">{{ $t("clear") }}</button>
+                        <button class="btn btn-primary" @click="convertDockerRun">{{ $t("convert") }}</button>
+                    </div>
+                </section>
 
-                        <div v-for="(agentItem, endpoint) in $root.agentList" :key="endpoint" class="mb-3 agent">
-                            <!-- Agent Status -->
-                            <template v-if="$root.agentStatusList[endpoint]">
-                                <span v-if="$root.agentStatusList[endpoint] === 'online'" class="badge bg-primary me-2">{{ $t("agentOnline") }}</span>
-                                <span v-else-if="$root.agentStatusList[endpoint] === 'offline'" class="badge bg-danger me-2">{{ $t("agentOffline") }}</span>
-                                <span v-else class="badge bg-secondary me-2">{{ $t($root.agentStatusList[endpoint]) }}</span>
-                            </template>
+                <section class="agents-panel">
+                    <div class="panel-heading agent-panel-heading">
+                        <h2>{{ $tc("dockgeAgent", 2) }}</h2>
+                        <button v-if="!showAgentForm" class="btn btn-link" @click="showAgentForm = true">
+                            <font-awesome-icon icon="plus" /> {{ $t("addAgent") }}
+                        </button>
+                    </div>
 
-                            <!-- Agent Display Name -->
-                            <template v-if="$root.agentStatusList[endpoint]">
-                                <span v-if="endpoint === '' && agentItem.name === ''" class="badge bg-secondary me-2">Current</span>
-                                <span v-else-if="agentItem.name === ''" :href="agentItem.url" class="me-2">{{ endpoint }}</span>
-                                <span v-else :href="agentItem.url" class="me-2">{{ agentItem.name }}</span>
-                            </template>
+                    <div class="agent-table-head">
+                        <span>{{ $t("Agent") }}</span><span>{{ $t("address") }}</span><span>{{ $t("Status") }}</span><span></span>
+                    </div>
 
-                            <!-- Edit Name  -->
-                            <font-awesome-icon v-if="agentItem.name !== ''" icon="pen-to-square" @click="showEditAgentNameDialog[agentItem.name] = !showEditAgentNameDialog[agentItem.Name]" />
+                    <div v-for="(agentItem, endpoint) in $root.agentList" :key="endpoint" class="agent-row">
+                        <strong>{{ agentItem.name || (endpoint === "" ? $t("currentEndpoint") : endpoint) }}</strong>
+                        <span class="agent-address">{{ agentItem.url || "127.0.0.1" }}</span>
+                        <span v-if="$root.agentStatusList[endpoint]" class="agent-status" :class="$root.agentStatusList[endpoint]">
+                            <i></i>{{ $t($root.agentStatusList[endpoint] === "online" ? "agentOnline" : $root.agentStatusList[endpoint] === "offline" ? "agentOffline" : $root.agentStatusList[endpoint]) }}
+                        </span>
+                        <div class="agent-actions">
+                            <button v-if="agentItem.name !== ''" class="icon-button" :aria-label="$t('Update Name')" @click="showEditAgentNameDialog[agentItem.name] = !showEditAgentNameDialog[agentItem.name]">
+                                <font-awesome-icon icon="pen-to-square" />
+                            </button>
 
                             <!-- Edit Dialog -->
                             <BModal v-model="showEditAgentNameDialog[agentItem.name]" :no-close-on-backdrop="true" :close-on-esc="true" :okTitle="$t('Update Name')" okVariant="info" @ok="updateName(agentItem.url, agentItem.updatedName)">
@@ -64,8 +63,9 @@
                                 <input id="updatedName" v-model="agentItem.updatedName" type="text" class="form-control" optional>
                             </BModal>
 
-                            <!-- Remove Button -->
-                            <font-awesome-icon v-if="endpoint !== ''" class="ms-2 remove-agent" icon="trash" @click="showRemoveAgentDialog[agentItem.url] = !showRemoveAgentDialog[agentItem.url]" />
+                            <button v-if="endpoint !== ''" class="icon-button" :aria-label="$t('removeAgent')" @click="showRemoveAgentDialog[agentItem.url] = !showRemoveAgentDialog[agentItem.url]">
+                                <font-awesome-icon icon="trash" />
+                            </button>
 
                             <!-- Remove Agent Dialog -->
                             <BModal v-model="showRemoveAgentDialog[agentItem.url]" :okTitle="$t('removeAgent')" okVariant="danger" @ok="removeAgent(agentItem.url)">
@@ -73,38 +73,39 @@
                                 {{ $t("removeAgentMsg") }}
                             </BModal>
                         </div>
-
-                        <button v-if="!showAgentForm" class="btn btn-normal" @click="showAgentForm = !showAgentForm">{{ $t("addAgent") }}</button>
-
-                        <!-- Add Agent Form -->
-                        <form v-if="showAgentForm" @submit.prevent="addAgent">
-                            <div class="mb-3">
-                                <label for="url" class="form-label">{{ $t("dockgeURL") }}</label>
-                                <input id="url" v-model="agent.url" type="url" class="form-control" required placeholder="http://">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="username" class="form-label">{{ $t("Username") }}</label>
-                                <input id="username" v-model="agent.username" type="text" class="form-control" required>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="password" class="form-label">{{ $t("Password") }}</label>
-                                <input id="password" v-model="agent.password" type="password" class="form-control" required autocomplete="new-password">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="name" class="form-label">{{ $t("Friendly Name") }}</label>
-                                <input id="name" v-model="agent.name" type="text" class="form-control" optional>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary" :disabled="connectingAgent">
-                                <template v-if="connectingAgent">{{ $t("connecting") }}</template>
-                                <template v-else>{{ $t("connect") }}</template>
-                            </button>
-                        </form>
                     </div>
-                </div>
+
+                    <form v-if="showAgentForm" class="agent-form" @submit.prevent="addAgent">
+                        <div class="agent-form-title">
+                            <strong>{{ $t("addAgent") }}</strong>
+                            <button type="button" class="icon-button" @click="showAgentForm = false"><font-awesome-icon icon="times" /></button>
+                        </div>
+                        <div class="mb-3">
+                            <label for="url" class="form-label">{{ $t("dockgeURL") }}</label>
+                            <input id="url" v-model="agent.url" type="url" class="form-control" required placeholder="http://">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="username" class="form-label">{{ $t("Username") }}</label>
+                            <input id="username" v-model="agent.username" type="text" class="form-control" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">{{ $t("Password") }}</label>
+                            <input id="password" v-model="agent.password" type="password" class="form-control" required autocomplete="new-password">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">{{ $t("Friendly Name") }}</label>
+                            <input id="name" v-model="agent.name" type="text" class="form-control" optional>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" :disabled="connectingAgent">
+                            <template v-if="connectingAgent">{{ $t("connecting") }}</template>
+                            <template v-else>{{ $t("connect") }}</template>
+                        </button>
+                    </form>
+                </section>
             </div>
         </div>
     </transition>
@@ -326,57 +327,265 @@ export default {
 <style lang="scss" scoped>
 @import "../styles/vars";
 
-.num {
-    font-size: 30px;
+.overview-page { margin: 0 auto; max-width: 1320px; }
 
-    font-weight: bold;
-    display: block;
+.overview-header {
+    align-items: center;
+    border-bottom: 1px solid #d9dce1;
+    display: flex;
+    justify-content: space-between;
+    margin: 0 -18px;
+    padding: 0 18px 12px;
 
-    &.active {
-        color: $primary;
-    }
-
-    &.exited {
-        color: $danger;
-    }
+    h1 { margin: 0; }
 }
 
-.shadow-box {
-    padding: 20px;
+.status-summary {
+    align-items: center;
+    color: #6f757d;
+    display: flex;
+    font-size: 12px;
+    gap: 0;
+
+    span {
+        align-items: center;
+        display: flex;
+        gap: 7px;
+        padding: 0 12px;
+
+        &:first-child { padding-left: 0; }
+        & + span { border-left: 1px solid #d0d4d9; }
+    }
+
+    i { background: #90969e; border-radius: 50%; height: 8px; width: 8px; }
+    strong { color: #272b30; font-family: "JetBrains Mono", monospace; font-weight: 500; }
+    .running i { background: #69c84b; }
+    .exited i { background: #e1ad29; }
 }
 
-table {
-    font-size: 14px;
+.overview-grid {
+    align-items: start;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+    padding-top: 12px;
+}
 
-    tr {
-        transition: all ease-in-out 0.2ms;
-    }
+.converter-panel,
+.agents-panel {
+    background: #fff;
+    border: 1px solid #d9dce1;
+    border-radius: 11px;
+    min-height: 390px;
+    padding: 16px;
+}
 
-    @media (max-width: 550px) {
-        table-layout: fixed;
-        overflow-wrap: break-word;
-    }
+.converter-panel {
+    margin: 0;
+}
+
+.agents-panel { margin: 0; }
+
+.panel-heading {
+    align-items: center;
+    border-bottom: 1px solid #d9dce1;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    min-height: 34px;
+    padding-bottom: 10px;
+
+    h2 { margin: 0; }
+    p { color: #737982; font-size: 12px; margin: 5px 0 0; }
+}
+
+.agent-panel-heading .btn,
+.converter-actions .btn-link {
+    color: $primary;
+    min-height: auto;
+    padding: 4px;
+    text-decoration: none;
+}
+
+.command-editor {
+    border: 1px solid #45494f;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.editor-bar {
+    align-items: center;
+    background: #1a1c1f;
+    border-bottom: 1px solid #45494f;
+    color: #8d929a;
+    display: flex;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 0 12px;
+}
+
+.editor-body {
+    background: #111315;
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    min-height: 240px;
+}
+
+.line-number {
+    border-right: 1px solid #292c30;
+    color: #626871;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    padding-top: 15px;
+    text-align: center;
 }
 
 .docker-run {
-    border: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 15px;
+    background: transparent;
+    border: 0;
+    color: #d9dce0;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    min-height: 240px;
+    outline: 0;
+    padding: 14px;
+    resize: vertical;
 }
 
-.first-row .shadow-box {
+.editor-help { color: #777d85; font-size: 11px; margin: 9px 0; }
 
+.converter-actions {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
 }
 
-.remove-agent {
-    cursor: pointer;
-    color: rgba(255, 255, 255, 0.3);
+.agent-table-head,
+.agent-row {
+    align-items: center;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(80px, 0.8fr) minmax(130px, 1.2fr) 76px 48px;
 }
 
-.agent {
-    a {
-        text-decoration: none;
+.agent-table-head {
+    border-bottom: 1px solid #d9dce1;
+    color: #777d85;
+    font-size: 10px;
+    padding: 0 7px 10px;
+    text-transform: uppercase;
+}
+
+.agent-row {
+    border-bottom: 1px solid #e0e3e6;
+    font-size: 12px;
+    min-height: 44px;
+    padding: 0 7px;
+
+    strong { font-weight: 550; }
+}
+
+.agent-address {
+    color: #747a82;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.agent-status {
+    align-items: center;
+    color: #727880;
+    display: flex;
+    font-size: 11px;
+    gap: 6px;
+    justify-self: start;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(123, 129, 137, 0.1);
+
+    i { background: #7b8189; border-radius: 50%; height: 7px; width: 7px; }
+    &.online { background: rgba(105, 200, 75, 0.1); }
+    &.online i { background: #69c84b; }
+    &.offline { background: rgba($danger, 0.1); }
+    &.offline i { background: $danger; }
+}
+
+.agent-actions { display: flex; }
+
+.icon-button {
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: #777d85;
+    height: 28px;
+    width: 28px;
+
+    &:hover { background: #eceef1; color: #262a2f; }
+}
+
+.agent-form {
+    border-top: 1px solid #d9dce1;
+    margin-top: 18px;
+    padding: 18px 7px;
+}
+
+.agent-form-title {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.dark {
+    .overview-header,
+    .panel-heading,
+    .agent-table-head,
+    .agent-row,
+    .agent-form { border-color: $dark-border-color; }
+
+    .status-summary {
+        color: $dark-font-color;
+
+        span + span { border-color: $dark-border-color; }
+        strong { color: #e1e3e6; }
     }
+
+    .panel-heading p,
+    .editor-help,
+    .agent-address { color: $dark-font-color3; }
+
+    .icon-button:hover { background: #222529; color: #f0f1f2; }
+
+    .converter-panel,
+    .agents-panel {
+        background: #1a1916;
+        border-color: #35332e;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    .editor-bar { background: #1f1d19; border-color: #3b3832; }
+    .editor-body { background: #121210; }
+}
+
+@media (max-width: 1120px) {
+    .overview-grid { grid-template-columns: 1fr; }
+    .converter-panel { margin: 0; }
+    .agents-panel { margin: 0; }
+    .dark .agents-panel { border-color: $dark-border-color; }
+}
+
+@media (max-width: 767px) {
+    .overview-header { align-items: flex-start; flex-direction: column; gap: 10px; margin-inline: -14px; padding-inline: 14px; }
+    .converter-panel, .agents-panel { min-height: 0; padding: 14px; }
+    .overview-grid { min-height: auto; }
+    .agent-table-head { display: none; }
+    .agent-row { grid-template-columns: minmax(80px, 1fr) 80px 48px; }
+    .agent-address { display: none; }
 }
 
 </style>

@@ -10,18 +10,33 @@
         </div>
 
         <!-- Desktop header -->
-        <header v-if="! $root.isMobile || $root.loggedIn" class="d-flex flex-wrap justify-content-center py-3 mb-3 border-bottom">
-            <router-link to="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-dark text-decoration-none">
-                <object class="bi me-2 ms-4" width="40" height="40" data="/icon.svg" />
+        <header v-if="! $root.isMobile || $root.loggedIn" class="app-rail">
+            <router-link to="/" class="app-brand">
+                <object class="brand-mark" width="40" height="40" data="/icon.svg" />
                 <span class="fs-4 title">Dockge</span>
-                <span class="fork-label">(krevoit Fork)</span>
             </router-link>
+
+            <label v-if="$root.loggedIn" class="header-agent-select">
+                <span class="agent-online-dot"></span>
+                <select v-model="headerAgent" aria-label="Agent" @change="selectHeaderAgent">
+                    <option value="">{{ $t("currentEndpoint") }}</option>
+                    <option v-for="(agent, endpoint) in $root.agentList" :key="endpoint" :value="endpoint">
+                        {{ agent.name || agent.url || endpoint }}
+                    </option>
+                </select>
+            </label>
+
+            <form v-if="$root.loggedIn" class="global-search" @submit.prevent="openGlobalSearchResult">
+                <font-awesome-icon icon="search" />
+                <input v-model="globalSearch" type="search" :placeholder="$t('searchStacks')" aria-label="Search stacks" />
+                <kbd>⌘K</kbd>
+            </form>
 
             <a v-if="hasNewVersion" target="_blank" href="https://github.com/krevoit/dockge/releases" class="btn btn-warning me-3">
                 <font-awesome-icon icon="arrow-alt-circle-up" /> {{ $t("newUpdate") }}
             </a>
 
-            <ul class="nav nav-pills">
+            <ul class="nav nav-pills rail-nav">
                 <li v-if="$root.loggedIn" class="nav-item me-2">
                     <router-link to="/" class="nav-link">
                         <font-awesome-icon icon="home" /> {{ $t("home") }}
@@ -97,7 +112,7 @@
             </ul>
         </header>
 
-        <main>
+        <main class="app-stage">
             <div v-if="$root.socketIO.connecting" class="container mt-5">
                 <h4>{{ $t("connecting...") }}</h4>
             </div>
@@ -121,7 +136,8 @@ export default {
 
     data() {
         return {
-
+            globalSearch: "",
+            headerAgent: "",
         };
     },
 
@@ -158,6 +174,25 @@ export default {
     },
 
     methods: {
+        openGlobalSearchResult() {
+            const query = this.globalSearch.trim().toLowerCase();
+            if (!query) {
+                return;
+            }
+            const stack = Object.values(this.$root.completeStackList)
+                .find(item => item.name.toLowerCase().includes(query));
+            if (stack) {
+                this.$router.push(stack.endpoint ? `/compose/${stack.name}/${stack.endpoint}` : `/compose/${stack.name}`);
+                this.globalSearch = "";
+            }
+        },
+        selectHeaderAgent() {
+            const stack = Object.values(this.$root.completeStackList)
+                .find(item => (item.endpoint || "") === this.headerAgent);
+            if (stack) {
+                this.$router.push(stack.endpoint ? `/compose/${stack.name}/${stack.endpoint}` : `/compose/${stack.name}`);
+            }
+        },
         scanFolder() {
             this.$root.emitAgent(ALL_ENDPOINTS, "requestStackList", (res) => {
                 this.$root.toastRes(res);
@@ -171,64 +206,98 @@ export default {
 <style lang="scss" scoped>
 @import "../styles/vars.scss";
 
-.nav-link {
-    &.status-page {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-}
-
-.bottom-nav {
-    z-index: 1000;
-    position: fixed;
-    bottom: 0;
-    height: calc(60px + env(safe-area-inset-bottom));
-    width: 100%;
+.app-rail {
+    align-items: center;
+    background: #161613;
+    border-bottom: 1px solid #35332e;
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    height: 58px;
     left: 0;
-    background-color: #fff;
-    box-shadow: 0 15px 47px 0 rgba(0, 0, 0, 0.05), 0 5px 14px 0 rgba(0, 0, 0, 0.05);
-    text-align: center;
-    white-space: nowrap;
-    padding: 0 10px env(safe-area-inset-bottom);
-
-    a {
-        text-align: center;
-        width: 25%;
-        display: inline-block;
-        height: 100%;
-        padding: 8px 10px 0;
-        font-size: 13px;
-        color: #c1c1c1;
-        overflow: hidden;
-        text-decoration: none;
-
-        &.router-link-exact-active, &.active {
-            color: $primary;
-            font-weight: bold;
-        }
-
-        div {
-            font-size: 20px;
-        }
-    }
+    padding: 0 20px;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1020;
 }
 
-main {
-    min-height: calc(100vh - 160px);
+.app-brand {
+    align-items: center;
+    color: #181a1d;
+    display: flex;
+    flex-direction: row;
+    margin: 0;
+    text-decoration: none;
 }
+
+.brand-mark { display: none; }
 
 .title {
-    font-weight: bold;
+    color: #df8338;
+    font-size: 19px !important;
+    font-weight: 720;
+    letter-spacing: -0.02em;
 }
 
 .fork-label {
-    color: $dark-font-color;
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin-left: 0.5rem;
+    color: #7a8089;
+    font-size: 9px;
+    margin-top: 1px;
 }
 
-.nav {
-    margin-right: 25px;
+.rail-nav {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 3px;
+    margin: 0;
+    width: auto;
+
+    .nav-item { margin: 0 !important; }
+
+    .nav-item:not(:last-child) { display: none; }
+
+    .nav-link {
+        align-items: center;
+        border: 0;
+        border-radius: 0;
+        color: #6e747c;
+        display: flex;
+        flex-direction: row;
+        font-size: 11px;
+        gap: 6px;
+        justify-content: center;
+        margin: 0;
+        min-height: 38px;
+        padding: 5px 8px;
+        width: auto;
+
+        svg { font-size: 19px; }
+
+        &:hover {
+            background: #e9ebee;
+            color: #1c1f23;
+        }
+
+        &.router-link-exact-active,
+        &.active {
+            background: rgba($primary, 0.12);
+            border-color: transparent;
+            border-radius: 7px;
+            color: $primary;
+        }
+    }
+
+    .dropdown-profile-pic {
+        margin-top: auto;
+    }
+}
+
+.app-stage {
+    margin-left: 0;
+    min-height: 100vh;
+    padding-top: 58px;
 }
 
 .lost-connection {
@@ -237,7 +306,66 @@ main {
     color: white;
     position: fixed;
     width: 100%;
+    left: 0;
     z-index: 99999;
+}
+
+.header-agent-select {
+    align-items: center;
+    background: #1c1b18;
+    border: 1px solid #3a3731;
+    border-radius: 7px;
+    display: flex;
+    height: 36px;
+    padding: 0 9px;
+
+    select {
+        appearance: none;
+        background: transparent;
+        border: 0;
+        color: #d2ccc2;
+        font-size: 12px;
+        min-width: 112px;
+        outline: 0;
+        padding: 0 18px 0 7px;
+    }
+}
+
+.agent-online-dot {
+    background: #6bc79b;
+    border-radius: 50%;
+    height: 7px;
+    width: 7px;
+}
+
+.global-search {
+    align-items: center;
+    background: #121210;
+    border: 1px solid #34322d;
+    border-radius: 7px;
+    color: #716d65;
+    display: flex;
+    height: 36px;
+    margin: 0 auto;
+    max-width: 500px;
+    padding: 0 10px;
+    width: min(42vw, 500px);
+
+    input {
+        background: transparent;
+        border: 0;
+        color: #d2ccc2;
+        flex: 1;
+        font-size: 12px;
+        outline: 0;
+        padding: 0 9px;
+    }
+
+    kbd {
+        background: #282622;
+        color: #8f897f;
+        font-size: 10px;
+    }
 }
 
 // Profile Pic Button with Dropdown
@@ -249,11 +377,12 @@ main {
         display: flex;
         gap: 6px;
         align-items: center;
-        background-color: rgba(200, 200, 200, 0.2);
-        padding: 0.5rem 0.8rem;
+        background: transparent;
+        border-left: 0;
+        padding: 8px;
 
         &:hover {
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: #e9ebee;
         }
     }
 
@@ -261,8 +390,11 @@ main {
         transition: all 0.2s;
         padding-left: 0;
         padding-bottom: 0;
-        margin-top: 8px !important;
-        border-radius: 16px;
+        bottom: 0 !important;
+        left: calc(100% + 8px) !important;
+        margin: 0 !important;
+        top: auto !important;
+        border-radius: 6px;
         overflow: hidden;
 
         .dropdown-divider {
@@ -306,8 +438,8 @@ main {
         justify-content: center;
         color: white;
         background-color: $primary;
-        width: 24px;
-        height: 24px;
+        width: 30px;
+        height: 30px;
         margin-right: 5px;
         border-radius: 50rem;
         font-weight: bold;
@@ -316,17 +448,76 @@ main {
 }
 
 .dark {
-    header {
+    .app-rail {
         background-color: $dark-header-bg;
-        border-bottom-color: $dark-header-bg !important;
+        border-bottom-color: $dark-border-color;
+    }
 
-        span {
-            color: #f0f6fc;
+    .app-brand .title { color: #df8338; }
+    .fork-label { color: $dark-font-color3 !important; }
+
+    .rail-nav .nav-link {
+        color: #8b9098;
+
+        &:hover { background: #1c1f22; color: #f1f2f3; }
+
+        &.router-link-exact-active,
+        &.active {
+            background: rgba($primary, 0.09);
+            color: $primary;
         }
     }
 
-    .bottom-nav {
-        background-color: $dark-bg;
+    .dropdown-profile-pic .nav-link:hover { background: #1c1f22; }
+}
+
+@media (max-width: 767px) {
+    .app-rail {
+        border-bottom: 1px solid #d9dce1;
+        border-right: 0;
+        flex-direction: row;
+        height: 60px;
+        padding: 0 8px;
+        width: 100%;
+    }
+
+    .app-brand {
+        flex-direction: row;
+        margin: 0 auto 0 0;
+
+        .brand-mark { height: 30px; margin: 0 7px 0 0; width: 30px; }
+        .fork-label { display: none; }
+    }
+
+    .header-agent-select,
+    .global-search { display: none; }
+
+    .rail-nav {
+        flex: 0 1 auto;
+        flex-direction: row;
+
+        .nav-item:not(:last-child) { display: block; }
+
+        .nav-link {
+            border-bottom: 2px solid transparent;
+            border-left: 0;
+            font-size: 0;
+            min-height: 60px;
+            min-width: 48px;
+
+            &.router-link-exact-active,
+            &.active { border-bottom-color: $primary; }
+        }
+    }
+
+    .dropdown-profile-pic { display: none; }
+
+    .app-stage { margin-left: 0; padding-top: 60px; }
+
+    .lost-connection { left: 0; width: 100%; }
+
+    .dark .app-rail {
+        border-bottom-color: $dark-border-color;
     }
 }
 </style>

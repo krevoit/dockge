@@ -54,12 +54,25 @@ function rootApp() {
                 loggedIn: false,
                 allowLoginDialog: false,
                 username: null,
+                windowWidth: window.innerWidth,
             };
         },
         computed: {
-
+            isMobile() {
+                return this.windowWidth < 768;
+            },
+        },
+        mounted() {
+            window.addEventListener("resize", this.updateWindowWidth);
+        },
+        beforeUnmount() {
+            window.removeEventListener("resize", this.updateWindowWidth);
         },
         methods: {
+
+            updateWindowWidth() {
+                this.windowWidth = window.innerWidth;
+            },
 
             /**
              * Show success or error toast dependant on response status code
