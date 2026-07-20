@@ -52,9 +52,6 @@
                     </button>
 
                     <BDropdown right text="" variant="normal">
-                        <BDropdownItem @click="showServices = !showServices">
-                            <font-awesome-icon icon="clone" class="me-1" /> {{ $tc("container", 2) }}
-                        </BDropdownItem>
                         <BDropdownItem @click="downStack">
                             <font-awesome-icon icon="stop" class="me-1" />
                             {{ $t("downStack") }}
@@ -91,7 +88,7 @@
             </transition>
 
             <div v-if="stack.isManagedByDockge" class="stack-content-layout">
-                <section v-show="showServices || isAdd" class="services-section">
+                <section class="services-section">
                     <!-- General -->
                     <div v-if="isAdd">
                         <h4 class="mb-3">{{ $t("general") }}</h4>
@@ -116,7 +113,12 @@
                     </div>
 
                     <!-- Containers -->
-                    <h4 class="mb-3">{{ $tc("container", 2) }}</h4>
+                    <div class="section-heading">
+                        <div>
+                            <h2>{{ $tc("container", 2) }}</h2>
+                            <span>{{ Object.keys(jsonConfig.services || {}).length }}</span>
+                        </div>
+                    </div>
 
                     <div v-if="isEditMode" class="input-group mb-3">
                         <input
@@ -130,7 +132,7 @@
                         </button>
                     </div>
 
-                    <div ref="containerList">
+                    <div ref="containerList" class="container-list">
                         <Container
                             v-for="(service, name) in jsonConfig.services"
                             :key="name"
@@ -336,12 +338,25 @@
                     </div>-->
                 </section>
 
-                <section v-show="!isEditMode && !isAdd" class="deploy-log-shell">
-                    <div class="deploy-log-heading">
-                        <h2>Deploy log</h2>
-                        <span><font-awesome-icon icon="check-circle" /> Live output</span>
+                <section v-show="!isEditMode && !isAdd" class="activity-output-shell" :class="{ expanded: outputExpanded, collapsed: !outputVisible }">
+                    <div class="activity-output-heading">
+                        <div>
+                            <h2>Activity &amp; output</h2>
+                            <span><font-awesome-icon icon="check-circle" /> Live</span>
+                        </div>
+                        <div class="output-actions">
+                            <button v-if="outputVisible" class="btn btn-normal output-toggle" type="button" @click="toggleOutputSize">
+                                <font-awesome-icon :icon="outputExpanded ? 'chevron-down' : 'expand'" />
+                                {{ outputExpanded ? 'Restore' : 'Expand' }}
+                            </button>
+                            <button class="btn btn-normal output-toggle" type="button" @click="toggleOutputVisibility">
+                                <font-awesome-icon :icon="outputVisible ? 'chevron-up' : 'chevron-down'" />
+                                {{ outputVisible ? 'Hide' : 'Show output' }}
+                            </button>
+                        </div>
                     </div>
                     <Terminal
+                        v-show="outputVisible"
                         ref="combinedTerminal"
                         class="terminal"
                         :name="combinedTerminalName"
@@ -514,7 +529,8 @@ export default {
             deleteStackFiles: false,
             showForceDeleteDialog: false,
             newContainerName: "",
-            showServices: false,
+            outputVisible: true,
+            outputExpanded: false,
             stopServiceStatusTimeout: false,
             stopDockerStatsTimeout: false,
         };
@@ -728,6 +744,17 @@ export default {
 
     },
     methods: {
+        toggleOutputSize() {
+            this.outputExpanded = !this.outputExpanded;
+            this.$nextTick(() => this.$refs.combinedTerminal?.updateTerminalSize());
+        },
+        toggleOutputVisibility() {
+            this.outputVisible = !this.outputVisible;
+            if (!this.outputVisible) {
+                this.outputExpanded = false;
+            }
+            this.$nextTick(() => this.$refs.combinedTerminal?.updateTerminalSize());
+        },
         updateEnvEntry(entry, value) {
             const lines = (this.stack.composeENV || "").split(/\r?\n/);
             lines[entry.lineIndex] = `${entry.key}=${value}`;
@@ -1079,15 +1106,15 @@ export default {
 
 .stack-detail-header {
     align-items: center;
-    background: #1a1916;
-    border: 1px solid #35332e;
-    border-radius: 11px;
+    background: #15171b;
+    border: 1px solid #2b2f36;
+    border-radius: 8px;
     display: flex;
-    gap: 18px;
+    gap: 16px;
     justify-content: space-between;
-    margin-bottom: 14px;
-    min-height: 82px;
-    padding: 13px 16px;
+    margin-bottom: 10px;
+    min-height: 76px;
+    padding: 12px 14px;
 }
 
 .stack-identity {
@@ -1098,17 +1125,18 @@ export default {
     min-width: 0;
 
     h1 {
-        color: #ece6dc;
-        font-size: 20px;
+        color: #f0f2f5;
+        font-size: 21px;
+        font-weight: 600;
         line-height: 1;
         margin: 0 4px 0 0;
     }
 
     small {
-        color: #777169;
+        color: #89919c;
         flex-basis: 100%;
         font-family: "JetBrains Mono", monospace;
-        font-size: 10px;
+        font-size: 11px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1127,36 +1155,59 @@ export default {
 .stack-content-layout {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
 }
 
 .configuration-shell,
-.deploy-log-shell,
+.activity-output-shell,
 .services-section {
-    background: #1a1916;
-    border: 1px solid #35332e;
-    border-radius: 11px;
+    background: #15171b;
+    border: 1px solid #2b2f36;
+    border-radius: 8px;
     overflow: hidden;
 }
 
-.configuration-shell { order: 1; }
-.deploy-log-shell { order: 2; }
-.services-section { order: 3; padding: 16px; }
+.services-section { order: 1; }
+.configuration-shell { order: 2; }
+.activity-output-shell { order: 3; }
 
 .configuration-heading,
-.deploy-log-heading {
+.activity-output-heading,
+.section-heading {
     align-items: center;
-    border-bottom: 1px solid #35332e;
+    border-bottom: 1px solid #2b2f36;
     display: flex;
     justify-content: space-between;
-    min-height: 54px;
-    padding: 9px 14px;
+    min-height: 48px;
+    padding: 8px 12px;
 
     h2 {
-        color: #e4ded5;
+        color: #e7eaee;
         font-size: 15px;
+        font-weight: 600;
         margin: 0;
     }
+}
+
+.section-heading > div,
+.activity-output-heading > div {
+    align-items: center;
+    display: flex;
+    gap: 9px;
+}
+
+.section-heading span {
+    color: #89919c;
+    font-size: 12px;
+}
+
+.services-section > .input-group,
+.container-list {
+    margin-inline: 12px;
+}
+
+.container-list {
+    padding-top: 10px;
 }
 
 .configuration-state {
@@ -1165,8 +1216,8 @@ export default {
     gap: 10px;
 
     > span {
-        color: #72bd8e;
-        font-size: 11px;
+        color: #69c590;
+        font-size: 12px;
     }
 }
 
@@ -1177,43 +1228,43 @@ export default {
 
 .compose-pane,
 .environment-pane {
-    background: #121210;
+    background: #101216;
     min-width: 0;
 }
 
-.compose-pane { border-right: 1px solid #35332e; }
+.compose-pane { border-right: 1px solid #2b2f36; }
 
 .pane-title {
     align-items: center;
-    background: #1c1b18;
-    border-bottom: 1px solid #35332e;
-    color: #ddd6cc;
+    background: #171a1f;
+    border-bottom: 1px solid #2b2f36;
+    color: #dfe3e8;
     display: flex;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: 13px;
+    font-weight: 600;
     justify-content: space-between;
     margin: 0;
     min-height: 43px;
     padding: 9px 12px;
 
     span {
-        color: #777169;
+        color: #89919c;
         font-family: "JetBrains Mono", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 400;
     }
 }
 
 .environment-table {
-    background: #121210;
-    height: 390px;
+    background: #101216;
+    height: 340px;
     overflow: auto;
 }
 
 .environment-table-head,
 .environment-row {
     align-items: center;
-    border-bottom: 1px solid #302e29;
+    border-bottom: 1px solid #252930;
     display: grid;
     grid-template-columns: minmax(130px, 1fr) minmax(120px, 1.25fr);
     min-height: 42px;
@@ -1221,20 +1272,20 @@ export default {
 }
 
 .environment-table-head {
-    color: #777169;
-    font-size: 9px;
+    color: #89919c;
+    font-size: 11px;
     min-height: 36px;
-    text-transform: uppercase;
+    font-weight: 500;
 }
 
 .environment-row {
-    color: #c5beb4;
+    color: #cdd2d9;
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: 11px;
     gap: 9px;
 
     code {
-        color: #cfc8bd;
+        color: #d7dce2;
         font-size: inherit;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1248,10 +1299,10 @@ export default {
     }
 
     input {
-        background: #191815;
-        border: 1px solid #3a3731;
+        background: #15181d;
+        border: 1px solid #343941;
         border-radius: 5px;
-        color: #d4cdc3;
+        color: #e1e4e8;
         font-family: inherit;
         font-size: inherit;
         min-height: 29px;
@@ -1263,25 +1314,44 @@ export default {
 .raw-env-button {
     background: transparent;
     border: 0;
-    color: #a69f95;
-    font-size: 10px;
+    color: #9ca4af;
+    font-size: 12px;
     padding: 11px;
 }
 
-.terminal { height: 176px; }
+.terminal {
+    border: 0;
+    border-radius: 0;
+    height: 176px;
+}
 
-.deploy-log-heading {
-    min-height: 42px;
-    padding-block: 6px;
+.activity-output-shell .terminal { height: 250px; }
+
+.activity-output-heading {
+    min-height: 48px;
 
     span {
-        color: #72bd8e;
-        font-size: 10px;
+        color: #69c590;
+        font-size: 12px;
     }
 }
 
+.activity-output-shell.expanded .terminal { height: min(56vh, 560px); }
+.activity-output-shell.collapsed .activity-output-heading { border-bottom: 0; }
+
+.output-toggle {
+    align-items: center;
+    display: inline-flex;
+    gap: 7px;
+}
+
+.output-actions {
+    display: flex;
+    gap: 7px;
+}
+
 :deep(.cm-variable-highlight) {
-    color: #d98745;
+    color: #7eabe9;
     font-weight: 600;
 }
 
@@ -1289,21 +1359,21 @@ export default {
     border: 0;
     border-radius: 0;
     font-family: "JetBrains Mono", monospace;
-    font-size: 11px;
-    height: 390px;
+    font-size: 12px;
+    height: 340px;
     margin: 0 !important;
     padding: 0;
 
     &.edit-mode {
-        background-color: #151410 !important;
+        background-color: #12151a !important;
     }
 
     position: relative;
 }
 
 :deep(.editor-box .cm-editor) {
-    background: #121210;
-    height: 390px;
+    background: #101216;
+    height: 340px;
 }
 
 :deep(.editor-box .cm-scroller) {
@@ -1312,9 +1382,9 @@ export default {
 }
 
 :deep(.editor-box .cm-gutters) {
-    background: #151512;
-    border-right-color: #302e29;
-    color: #625f58;
+    background: #13161a;
+    border-right-color: #252930;
+    color: #68717d;
 }
 
 .expand-button {
@@ -1335,24 +1405,24 @@ export default {
 }
 
 .agent-name {
-    color: #8f887f;
-    font-size: 10px;
+    color: #929aa5;
+    font-size: 11px;
 }
 
 .stack-update-indicator {
     background: rgba($primary, 0.12);
     border: 1px solid rgba($primary, 0.35);
-    border-radius: 5px;
-    color: #e39a5d;
+    border-radius: 4px;
+    color: #e0b25b;
     display: inline-flex;
-    font-size: 9px;
+    font-size: 11px;
     padding: 3px 6px;
     vertical-align: middle;
 }
 
 @media (max-width: 1100px) {
     .configuration-grid { grid-template-columns: 1fr; }
-    .compose-pane { border-bottom: 1px solid #35332e; border-right: 0; }
+    .compose-pane { border-bottom: 1px solid #2b2f36; border-right: 0; }
     .editor-box,
     :deep(.editor-box .cm-editor),
     .environment-table { height: 310px; }
@@ -1363,7 +1433,7 @@ export default {
     :deep(.editor-box .cm-editor),
     .environment-table { height: 230px; }
 
-    .terminal { height: 108px; }
+    .terminal { height: 210px; }
 }
 
 @media (max-width: 767px) {

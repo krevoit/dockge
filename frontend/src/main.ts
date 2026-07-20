@@ -14,6 +14,7 @@ import "@xterm/xterm/lib/xterm.js";
 
 // CSS
 import "@fontsource/jetbrains-mono";
+import "@fontsource-variable/ibm-plex-sans";
 import "vue-toastification/dist/index.css";
 import "@xterm/xterm/css/xterm.css";
 import "./styles/main.scss";

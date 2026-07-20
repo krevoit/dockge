@@ -150,10 +150,10 @@
 
             <div v-for="(agent, index) in agentStackList" :key="index" class="stack-list-inner">
                 <div v-if="index === 0" class="stack-table-head" :style="columnGridStyle">
-                    <span>{{ $t("stackName") }}</span>
-                    <span v-if="visibleColumns.agent">{{ $t("Agent") }}</span>
-                    <span v-if="visibleColumns.status">{{ $t("Status") }}</span>
-                    <span v-if="visibleColumns.updates">{{ $t("updates") }}</span>
+                    <span class="name-column">{{ $t("stackName") }}</span>
+                    <span v-if="visibleColumns.agent" class="agent-column">{{ $t("Agent") }}</span>
+                    <span v-if="visibleColumns.status" class="status-column">{{ $t("Status") }}</span>
+                    <span v-if="visibleColumns.updates" class="updates-column">{{ $t("updates") }}</span>
                 </div>
                 <div
                     v-if="$root.agentCount > 1"
@@ -362,15 +362,15 @@ export default {
             return { height: `calc(100% - ${listHeaderHeight}px)` };
         },
         columnGridStyle() {
-            const columns = [ "minmax(100px, 1fr)" ];
+            const columns = [ "minmax(140px, 1.45fr)" ];
             if (this.visibleColumns.agent) {
-                columns.push("minmax(62px, .7fr)");
+                columns.push("minmax(88px, 1fr)");
             }
             if (this.visibleColumns.status) {
-                columns.push("68px");
+                columns.push("76px");
             }
             if (this.visibleColumns.updates) {
-                columns.push("34px");
+                columns.push("62px");
             }
             return { gridTemplateColumns: columns.join(" ") };
         },
@@ -560,7 +560,7 @@ export default {
 }
 
 .list-header {
-    border-bottom: 1px solid #35332e;
+    border-bottom: 1px solid #2b2f36;
     margin-bottom: 0;
     padding-bottom: 12px;
 
@@ -632,8 +632,9 @@ export default {
 
 .filter-icon-container {
     align-items: center;
-    border: 1px solid #3b3832;
-    color: #b7b0a6;
+    border: 1px solid #343941;
+    border-radius: 6px;
+    color: #aab1bb;
     display: flex;
     gap: 7px;
     min-height: 34px;
@@ -645,21 +646,21 @@ export default {
 
 .updates-only-toggle {
     align-items: center;
-    background: #1c1b18;
-    border: 1px solid #3b3832;
-    border-radius: 7px;
-    color: #b9b2a8;
+    background: #191c21;
+    border: 1px solid #343941;
+    border-radius: 6px;
+    color: #adb4be;
     display: flex;
-    font-size: 11px;
+    font-size: 12px;
     gap: 7px;
     min-height: 34px;
     padding: 0 10px;
 
     span {
         align-items: center;
-        background: #302c25;
-        border-radius: 10px;
-        color: #d9a35b;
+        background: #292e36;
+        border-radius: 4px;
+        color: #d8aa51;
         display: inline-flex;
         font-size: 10px;
         height: 18px;
@@ -669,9 +670,9 @@ export default {
     }
 
     &.active {
-        background: rgba($primary, 0.12);
+        background: rgba($primary, 0.1);
         border-color: rgba($primary, 0.65);
-        color: #e7a366;
+        color: #8bb3eb;
     }
 }
 
@@ -685,9 +686,9 @@ export default {
 }
 
 .filter-dropdown {
-    background: #201f1b;
+    background: #191c21;
     border: 1px solid $dark-border-color;
-    border-radius: 9px;
+    border-radius: 7px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
     color: $dark-font-color;
     min-width: 230px;
@@ -722,8 +723,8 @@ export default {
 
 .filter-heading {
     color: $dark-font-color;
-    font-size: 0.8rem;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
     margin-bottom: 6px;
 }
 
@@ -732,6 +733,7 @@ export default {
     cursor: pointer;
     display: flex;
     gap: 8px;
+    font-size: 13px;
     margin-bottom: 7px;
     white-space: nowrap;
 }
@@ -761,12 +763,12 @@ export default {
 }
 
 .agent-select {
-    border-bottom: 1px solid #302e29;
-    border-top: 1px solid #302e29;
+    border-bottom: 1px solid #292e35;
+    border-top: 1px solid #292e35;
     cursor: pointer;
-    font-size: 11px;
-    font-weight: 620;
-    color: #aaa39a;
+    color: #aeb5bf;
+    font-size: 12px;
+    font-weight: 500;
     min-height: 37px;
     padding: 8px 10px !important;
     display: flex;
@@ -794,11 +796,19 @@ export default {
 }
 
 .stack-table-head {
-    color: #8b857b;
+    color: #89919c;
     display: grid;
-    font-size: 9px;
+    font-size: 11px;
+    font-weight: 500;
     gap: 8px;
     padding: 10px 8px 8px 12px;
-    text-transform: uppercase;
+}
+
+.status-column { text-align: left; }
+.updates-column { text-align: center; }
+
+.search-input {
+    background: #101216;
+    border-color: #30353d;
 }
 </style>

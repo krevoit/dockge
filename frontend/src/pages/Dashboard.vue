@@ -42,24 +42,24 @@ export default {
 }
 
 .dashboard-shell {
-    background: #0f100f;
-    min-height: calc(100vh - 58px);
-    padding: 14px;
+    background: #0c0d0f;
+    min-height: calc(100vh - 62px);
+    padding: 10px;
 
     > .row {
         display: grid;
-        gap: 14px;
-        grid-template-columns: minmax(390px, 36%) minmax(0, 1fr);
+        gap: 10px;
+        grid-template-columns: minmax(370px, 28%) minmax(0, 1fr);
     }
 }
 
 .stack-browser {
-    background: #1a1916;
-    border: 1px solid #35332e;
-    border-radius: 11px;
-    height: calc(100vh - 86px);
+    background: #15171b;
+    border: 1px solid #2b2f36;
+    border-radius: 8px;
+    height: calc(100vh - 82px);
     overflow: hidden;
-    padding: 15px 14px 0;
+    padding: 13px 12px 0;
     position: sticky;
     top: 72px;
     width: auto;
@@ -72,7 +72,7 @@ export default {
     margin: 0 2px 12px;
 
     div { align-items: baseline; display: flex; gap: 9px; }
-    strong { font-size: 19px; font-weight: 680; letter-spacing: -0.025em; }
+    strong { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
     span { color: #858b93; font-size: 12px; }
 }
 
@@ -84,8 +84,8 @@ export default {
 
 .dark {
     .stack-browser {
-        background: #1a1916;
-        border-color: #35332e;
+        background: #15171b;
+        border-color: #2b2f36;
     }
 
     .dashboard-workbench {
@@ -96,7 +96,7 @@ export default {
 }
 
 @media (max-width: 1199px) {
-    .dashboard-shell > .row { grid-template-columns: minmax(320px, 38%) minmax(0, 1fr); }
+    .dashboard-shell > .row { grid-template-columns: minmax(330px, 34%) minmax(0, 1fr); }
 }
 
 @media (max-width: 767px) {

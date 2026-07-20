@@ -20,8 +20,8 @@
                 <span class="agent-online-dot"></span>
                 <select v-model="headerAgent" aria-label="Agent" @change="selectHeaderAgent">
                     <option value="">{{ $t("currentEndpoint") }}</option>
-                    <option v-for="(agent, endpoint) in $root.agentList" :key="endpoint" :value="endpoint">
-                        {{ agent.name || agent.url || endpoint }}
+                    <option v-for="agent in headerAgentOptions" :key="agent.endpoint" :value="agent.endpoint">
+                        {{ agent.label }}
                     </option>
                 </select>
             </label>
@@ -159,6 +159,15 @@ export default {
             }
         },
 
+        headerAgentOptions() {
+            return Object.entries(this.$root.agentList)
+                .filter(([ endpoint ]) => endpoint !== "")
+                .map(([ endpoint, agent ]) => ({
+                    endpoint,
+                    label: agent.name || agent.url || endpoint,
+                }));
+        },
+
     },
 
     watch: {
@@ -208,14 +217,14 @@ export default {
 
 .app-rail {
     align-items: center;
-    background: #161613;
-    border-bottom: 1px solid #35332e;
+    background: #111317;
+    border-bottom: 1px solid #2b2f36;
     display: flex;
     flex-direction: row;
-    gap: 16px;
-    height: 58px;
+    gap: 14px;
+    height: 62px;
     left: 0;
-    padding: 0 20px;
+    padding: 0 18px;
     position: fixed;
     top: 0;
     width: 100%;
@@ -224,20 +233,26 @@ export default {
 
 .app-brand {
     align-items: center;
-    color: #181a1d;
+    color: #f0f2f5;
     display: flex;
     flex-direction: row;
     margin: 0;
     text-decoration: none;
 }
 
-.brand-mark { display: none; }
+.brand-mark {
+    display: block;
+    height: 28px;
+    margin-right: 9px;
+    pointer-events: none;
+    width: 28px;
+}
 
 .title {
-    color: #df8338;
+    color: #f0f2f5;
     font-size: 19px !important;
-    font-weight: 720;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    letter-spacing: -0.018em;
 }
 
 .fork-label {
@@ -297,7 +312,7 @@ export default {
 .app-stage {
     margin-left: 0;
     min-height: 100vh;
-    padding-top: 58px;
+    padding-top: 62px;
 }
 
 .lost-connection {
@@ -312,19 +327,19 @@ export default {
 
 .header-agent-select {
     align-items: center;
-    background: #1c1b18;
-    border: 1px solid #3a3731;
-    border-radius: 7px;
+    background: #17191d;
+    border: 1px solid #30343c;
+    border-radius: 6px;
     display: flex;
     height: 36px;
     padding: 0 9px;
 
     select {
-        appearance: none;
+        appearance: auto;
         background: transparent;
         border: 0;
-        color: #d2ccc2;
-        font-size: 12px;
+        color: #d9dde3;
+        font-size: 13px;
         min-width: 112px;
         outline: 0;
         padding: 0 18px 0 7px;
@@ -332,7 +347,7 @@ export default {
 }
 
 .agent-online-dot {
-    background: #6bc79b;
+    background: #65c58f;
     border-radius: 50%;
     height: 7px;
     width: 7px;
@@ -340,10 +355,10 @@ export default {
 
 .global-search {
     align-items: center;
-    background: #121210;
-    border: 1px solid #34322d;
-    border-radius: 7px;
-    color: #716d65;
+    background: #0d0f12;
+    border: 1px solid #2b2f36;
+    border-radius: 6px;
+    color: #7f8792;
     display: flex;
     height: 36px;
     margin: 0 auto;
@@ -354,16 +369,16 @@ export default {
     input {
         background: transparent;
         border: 0;
-        color: #d2ccc2;
+        color: #e1e4e8;
         flex: 1;
-        font-size: 12px;
+        font-size: 13px;
         outline: 0;
         padding: 0 9px;
     }
 
     kbd {
-        background: #282622;
-        color: #8f897f;
+        background: #22262c;
+        color: #929aa5;
         font-size: 10px;
     }
 }
@@ -390,11 +405,15 @@ export default {
         transition: all 0.2s;
         padding-left: 0;
         padding-bottom: 0;
-        bottom: 0 !important;
-        left: calc(100% + 8px) !important;
-        margin: 0 !important;
-        top: auto !important;
-        border-radius: 6px;
+        bottom: auto !important;
+        left: auto !important;
+        margin: 8px 0 0 !important;
+        min-width: 230px;
+        position: absolute !important;
+        right: 0 !important;
+        top: 100% !important;
+        transform: none !important;
+        border-radius: 7px;
         overflow: hidden;
 
         .dropdown-divider {
@@ -437,13 +456,13 @@ export default {
         align-items: center;
         justify-content: center;
         color: white;
-        background-color: $primary;
+        background-color: #313743;
         width: 30px;
         height: 30px;
         margin-right: 5px;
         border-radius: 50rem;
-        font-weight: bold;
-        font-size: 10px;
+        font-weight: 600;
+        font-size: 12px;
     }
 }
 
@@ -453,7 +472,7 @@ export default {
         border-bottom-color: $dark-border-color;
     }
 
-    .app-brand .title { color: #df8338; }
+    .app-brand .title { color: #f0f2f5; }
     .fork-label { color: $dark-font-color3 !important; }
 
     .rail-nav .nav-link {

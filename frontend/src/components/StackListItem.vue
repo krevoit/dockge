@@ -6,8 +6,8 @@
                 <span>{{ stackName }}</span>
             </div>
         </div>
-        <span v-if="showAgent" class="endpoint">{{ endpointDisplay }}</span>
-        <span v-if="showStatus" class="status-text">{{ statusText }}</span>
+        <span v-if="showAgent" class="endpoint agent-column">{{ endpointDisplay }}</span>
+        <span v-if="showStatus" class="status-text status-column">{{ statusText }}</span>
         <span v-if="showUpdates" class="update-cell">
             <font-awesome-icon v-if="stack.hasUpdates" class="update-indicator" icon="cloud-arrow-down" :title="updateTitle" />
             <span v-else>—</span>
@@ -170,8 +170,8 @@ export default {
     display: grid;
     gap: 8px;
     align-items: center;
-    min-height: 43px;
-    border-bottom: 1px solid #302e29;
+    min-height: 42px;
+    border-bottom: 1px solid #292e35;
     border-left: 2px solid transparent;
     border-radius: 0;
     transition: all ease-in-out 0.15s;
@@ -195,20 +195,20 @@ export default {
     }
 
     .title {
-        color: #262a2f;
-        font-size: 11px;
-        font-weight: 570;
+        color: #e1e4e8;
+        font-size: 13px;
+        font-weight: 500;
         line-height: 1.25;
 
-        .dark & { color: #e2e4e7; }
+        .dark & { color: #e1e4e8; }
     }
     .update-indicator {
-        color: #df8a43;
-        font-size: 11px;
+        color: #d8aa51;
+        font-size: 12px;
     }
     .endpoint {
         font-family: "JetBrains Mono", monospace;
-        font-size: 10px;
+        font-size: 11px;
         color: $dark-font-color3;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -217,14 +217,14 @@ export default {
 }
 
 .status-text {
-    color: #979188;
-    font-size: 10px;
+    color: #a1a9b4;
+    font-size: 12px;
     text-transform: capitalize;
 }
 
 .update-cell {
     color: $dark-font-color3;
-    font-size: 10px;
+    font-size: 11px;
     text-align: center;
 }
 

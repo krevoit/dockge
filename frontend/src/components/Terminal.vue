@@ -103,7 +103,9 @@ export default {
 
         // Bind to a div
         this.terminal.open(this.$refs.terminal);
-        this.terminal.focus();
+        if (this.mode !== "displayOnly") {
+            this.terminal.focus();
+        }
 
         this.attachClipboardHandlers();
 
@@ -493,6 +495,10 @@ export default {
 <style scoped lang="scss">
 .main-terminal {
     height: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    width: 100%;
 }
 </style>
 
@@ -500,5 +506,8 @@ export default {
 .terminal {
     background-color: black !important;
     height: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 </style>

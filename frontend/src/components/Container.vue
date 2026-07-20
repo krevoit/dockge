@@ -25,14 +25,14 @@
                 <div class="action-group" role="group">
                     <router-link v-if="!isEditMode && (status === 'running' || status === 'healthy')" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
                         <font-awesome-icon icon="terminal" />
-                        Bash
+                        {{ $t("console") }}
                     </router-link>
                     <router-link v-if="!isEditMode" class="btn btn-normal action-btn" :to="logsRouteLink">
                         <font-awesome-icon icon="stream" />
                         {{ $t("logs") }}
                     </router-link>
                     <button
-                        v-if="serviceCount > 1 && !isEditMode && status !== 'running' && status !== 'healthy'"
+                        v-if="!isEditMode && status !== 'running' && status !== 'healthy'"
                         class="btn btn-primary action-btn"
                         :disabled="processing"
                         @click="startService"
@@ -41,7 +41,7 @@
                         {{ $t("startStack") }}
                     </button>
                     <button
-                        v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
+                        v-if="!isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
                         class="btn btn-normal action-btn"
                         :disabled="processing"
                         @click="stopService"
@@ -50,7 +50,7 @@
                         {{ $t("stopStack") }}
                     </button>
                     <button
-                        v-if="serviceCount > 1 && !isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
+                        v-if="!isEditMode && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
                         class="btn btn-normal action-btn"
                         :disabled="processing"
                         @click="restartService"
@@ -339,10 +339,6 @@ export default defineComponent({
             return this.jsonObject.services[this.name];
         },
 
-        serviceCount() {
-            return Object.keys(this.jsonObject.services).length;
-        },
-
         jsonObject() {
             return this.$parent.$parent.jsonConfig;
         },
@@ -437,11 +433,18 @@ export default defineComponent({
 @import "../styles/vars";
 
 .container {
+    background: #111318 !important;
+    border-color: #292e35 !important;
+    border-radius: 6px !important;
+    margin-bottom: 8px !important;
+    max-width: none;
+    padding: 10px 12px !important;
+
     .container-header {
-        align-items: start;
+        align-items: center;
         display: grid;
-        gap: 1rem;
-        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+        grid-template-columns: minmax(210px, 1fr) auto;
     }
 
     .container-summary {
@@ -452,9 +455,12 @@ export default defineComponent({
         align-items: center;
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 8px;
 
         h4 {
+            color: #e5e8ec;
+            font-size: 14px;
+            font-weight: 600;
             margin-bottom: 0;
             max-width: 100%;
             overflow-wrap: anywhere;
@@ -462,36 +468,39 @@ export default defineComponent({
     }
 
     .image {
-        font-size: 0.8rem;
-        color: #6c757d;
+        color: #89919c;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        margin: 3px 0 5px !important;
         overflow-wrap: anywhere;
 
         .tag {
-            color: #33383b;
+            color: #aeb5bf;
         }
     }
 
     .function {
         display: flex;
         min-width: 0;
-        justify-content: start;
+        justify-content: end;
     }
 
     .action-group {
         display: flex;
         flex-wrap: wrap;
         gap: 0.35rem;
-        justify-content: start;
+        justify-content: end;
     }
 
     .action-btn {
         align-items: center;
-        border-radius: 8px !important;
+        border-radius: 5px !important;
         display: inline-flex;
         gap: 0.35rem;
-        font-size: 0.85rem;
+        font-size: 12px;
         line-height: 1.2;
-        padding: 0.38rem 0.6rem;
+        min-height: 30px;
+        padding: 0.3rem 0.55rem;
 
         svg {
             flex: 0 0 auto;
@@ -503,7 +512,7 @@ export default defineComponent({
 
     .update-indicator {
         align-items: center;
-        color: $primary;
+        color: #d8aa51;
         display: inline-flex;
         font-size: 0.78rem;
         font-weight: 600;
@@ -517,9 +526,19 @@ export default defineComponent({
     }
 
     .stats {
-        font-size: 0.8rem;
-        color: #6c757d;
+        color: #89919c;
+        font-size: 12px;
     }
 
+}
+
+@media (max-width: 980px) {
+    .container .container-header {
+        align-items: start;
+        grid-template-columns: 1fr;
+    }
+
+    .container .function,
+    .container .action-group { justify-content: start; }
 }
 </style>

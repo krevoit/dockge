@@ -375,7 +375,7 @@ export default {
 .agents-panel {
     background: #fff;
     border: 1px solid #d9dce1;
-    border-radius: 11px;
+    border-radius: 8px;
     min-height: 390px;
     padding: 16px;
 }
@@ -505,7 +505,7 @@ export default {
     gap: 6px;
     justify-self: start;
     padding: 3px 7px;
-    border-radius: 999px;
+    border-radius: 4px;
     background: rgba(123, 129, 137, 0.1);
 
     i { background: #7b8189; border-radius: 50%; height: 7px; width: 7px; }
@@ -563,13 +563,13 @@ export default {
 
     .converter-panel,
     .agents-panel {
-        background: #1a1916;
-        border-color: #35332e;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+        background: #15171b;
+        border-color: #2b2f36;
+        box-shadow: none;
     }
 
-    .editor-bar { background: #1f1d19; border-color: #3b3832; }
-    .editor-body { background: #121210; }
+    .editor-bar { background: #191c21; border-color: #343941; }
+    .editor-body { background: #101216; }
 }
 
 @media (max-width: 1120px) {
