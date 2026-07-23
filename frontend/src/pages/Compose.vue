@@ -76,15 +76,24 @@
 
             <!-- Progress Terminal -->
             <transition name="slide-fade" appear>
-                <Terminal
-                    v-show="showProgressTerminal"
-                    ref="progressTerminal"
-                    class="mb-3 terminal"
-                    :name="terminalName"
-                    :endpoint="endpoint"
-                    :rows="progressTerminalRows"
-                    @has-data="showProgressTerminal = true; submitted = true;"
-                ></Terminal>
+                <section v-show="showProgressTerminal" class="update-output-shell mb-3">
+                    <div class="update-output-heading">
+                        <div>
+                            <span class="output-status-dot"></span>
+                            <strong>Update output</strong>
+                        </div>
+                        <span>Live command output</span>
+                    </div>
+                    <Terminal
+                        ref="progressTerminal"
+                        class="terminal"
+                        :name="terminalName"
+                        :endpoint="endpoint"
+                        :rows="progressTerminalRows"
+                        :font-size="12"
+                        @has-data="showProgressTerminal = true; submitted = true;"
+                    ></Terminal>
+                </section>
             </transition>
 
             <div v-if="stack.isManagedByDockge" class="stack-content-layout">
@@ -120,25 +129,11 @@
                         </div>
                     </div>
 
-                    <div v-if="isEditMode" class="input-group mb-3">
-                        <input
-                            v-model="newContainerName"
-                            :placeholder="$t(`New Container Name...`)"
-                            class="form-control"
-                            @keyup.enter="addContainer"
-                        />
-                        <button class="btn btn-primary" @click="addContainer">
-                            {{ $t("addContainer") }}
-                        </button>
-                    </div>
-
                     <div ref="containerList" class="container-list">
                         <Container
                             v-for="(service, name) in jsonConfig.services"
                             :key="name"
                             :name="name"
-                            :is-edit-mode="isEditMode"
-                            :first="name === Object.keys(jsonConfig.services)[0]"
                             :serviceStatus="serviceStatusList[name]"
                             :dockerStats="dockerStats"
                             :update-services="globalStack?.updateServices || []"
@@ -146,22 +141,6 @@
                             @stop-service="stopService"
                             @restart-service="restartService"
                         />
-                    </div>
-
-                    <button v-if="false && isEditMode && jsonConfig.services && Object.keys(jsonConfig.services).length > 0" class="btn btn-normal mb-3" @click="addContainer">{{ $t("addContainer") }}</button>
-
-                    <!-- General -->
-                    <div v-if="isEditMode">
-                        <h4 class="mb-3">{{ $t("extra") }}</h4>
-                        <div class="shadow-box big-padding mb-3">
-                            <!-- URLs -->
-                            <div class="mb-4">
-                                <label class="form-label">
-                                    {{ $tc("url", 2) }}
-                                </label>
-                                <ArrayInput name="urls" :display-name="$t('url')" placeholder="https://" object-type="x-dockge" />
-                            </div>
-                        </div>
                     </div>
                 </section>
                 <section class="configuration-shell">
@@ -315,21 +294,6 @@
                         </div>
                     </div>
 
-                    <div v-if="isEditMode">
-                        <!-- Volumes -->
-                        <div v-if="false">
-                            <h4 class="mb-3">{{ $tc("volume", 2) }}</h4>
-                            <div class="shadow-box big-padding mb-3">
-                            </div>
-                        </div>
-
-                        <!-- Networks -->
-                        <h4 class="mb-3">{{ $tc("network", 2) }}</h4>
-                        <div class="shadow-box big-padding mb-3">
-                            <NetworkInput />
-                        </div>
-                    </div>
-
                     <!-- <div class="shadow-box big-padding mb-3">
                         <div class="mb-3">
                             <label for="name" class="form-label"> Search Templates</label>
@@ -407,7 +371,6 @@ import {
     RUNNING
 } from "../../../common/util-common";
 import { BModal } from "bootstrap-vue-next";
-import NetworkInput from "../components/NetworkInput.vue";
 import dotenv from "dotenv";
 import { ref } from "vue";
 
@@ -465,7 +428,6 @@ const variableHighlight = ViewPlugin.fromClass(class {
 
 export default {
     components: {
-        NetworkInput,
         FontAwesomeIcon,
         CodeMirror,
         BModal,
@@ -528,7 +490,6 @@ export default {
             showDeleteDialog: false,
             deleteStackFiles: false,
             showForceDeleteDialog: false,
-            newContainerName: "",
             outputVisible: true,
             outputExpanded: false,
             stopServiceStatusTimeout: false,
@@ -1031,30 +992,6 @@ export default {
             // TODO: implement validation
         },
 
-        addContainer() {
-            this.checkYAML();
-
-            if (this.jsonConfig.services[this.newContainerName]) {
-                this.$root.toastError("Container name already exists");
-                return;
-            }
-
-            if (!this.newContainerName) {
-                this.$root.toastError("Container name cannot be empty");
-                return;
-            }
-
-            this.jsonConfig.services[this.newContainerName] = {
-                restart: "unless-stopped",
-            };
-            this.newContainerName = "";
-            let element = this.$refs.containerList.lastElementChild;
-            element.scrollIntoView({
-                block: "start",
-                behavior: "smooth"
-            });
-        },
-
         stackNameToLowercase() {
             this.stack.name = this.stack?.name?.toLowerCase();
         },
@@ -1106,8 +1043,9 @@ export default {
 
 .stack-detail-header {
     align-items: center;
-    background: #15171b;
-    border: 1px solid #2b2f36;
+    background: #12161c;
+    border: 1px solid #333b47;
+    border-left: 3px solid #6ea8fe;
     border-radius: 8px;
     display: flex;
     gap: 16px;
@@ -1133,7 +1071,7 @@ export default {
     }
 
     small {
-        color: #89919c;
+        color: #a5b1c0;
         flex-basis: 100%;
         font-family: "JetBrains Mono", monospace;
         font-size: 11px;
@@ -1161,21 +1099,32 @@ export default {
 .configuration-shell,
 .activity-output-shell,
 .services-section {
-    background: #15171b;
-    border: 1px solid #2b2f36;
+    background: #11151b;
+    border: 1px solid #333b47;
     border-radius: 8px;
     overflow: hidden;
 }
 
-.services-section { order: 1; }
-.configuration-shell { order: 2; }
-.activity-output-shell { order: 3; }
+.services-section {
+    border-top: 2px solid #4fd1c5;
+    order: 1;
+}
+
+.configuration-shell {
+    border-top: 2px solid #6ea8fe;
+    order: 2;
+}
+
+.activity-output-shell {
+    border-top: 2px solid #5bd69a;
+    order: 3;
+}
 
 .configuration-heading,
 .activity-output-heading,
 .section-heading {
     align-items: center;
-    border-bottom: 1px solid #2b2f36;
+    border-bottom: 1px solid #303846;
     display: flex;
     justify-content: space-between;
     min-height: 48px;
@@ -1197,7 +1146,7 @@ export default {
 }
 
 .section-heading span {
-    color: #89919c;
+    color: #a8b4c3;
     font-size: 12px;
 }
 
@@ -1216,7 +1165,7 @@ export default {
     gap: 10px;
 
     > span {
-        color: #69c590;
+        color: #75dfa9;
         font-size: 12px;
     }
 }
@@ -1228,17 +1177,17 @@ export default {
 
 .compose-pane,
 .environment-pane {
-    background: #101216;
+    background: #0c1016;
     min-width: 0;
 }
 
-.compose-pane { border-right: 1px solid #2b2f36; }
+.compose-pane { border-right: 1px solid #303846; }
 
 .pane-title {
     align-items: center;
-    background: #171a1f;
-    border-bottom: 1px solid #2b2f36;
-    color: #dfe3e8;
+    background: #141922;
+    border-bottom: 1px solid #303846;
+    color: #e7edf4;
     display: flex;
     font-size: 13px;
     font-weight: 600;
@@ -1248,7 +1197,7 @@ export default {
     padding: 9px 12px;
 
     span {
-        color: #89919c;
+        color: #9eacbd;
         font-family: "JetBrains Mono", monospace;
         font-size: 10px;
         font-weight: 400;
@@ -1256,7 +1205,7 @@ export default {
 }
 
 .environment-table {
-    background: #101216;
+    background: #0c1016;
     height: 340px;
     overflow: auto;
 }
@@ -1272,20 +1221,20 @@ export default {
 }
 
 .environment-table-head {
-    color: #89919c;
+    color: #a9b5c4;
     font-size: 11px;
     min-height: 36px;
     font-weight: 500;
 }
 
 .environment-row {
-    color: #cdd2d9;
+    color: #d5dde6;
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
     gap: 9px;
 
     code {
-        color: #d7dce2;
+        color: #f0c36f;
         font-size: inherit;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1299,8 +1248,8 @@ export default {
     }
 
     input {
-        background: #15181d;
-        border: 1px solid #343941;
+        background: #10151d;
+        border: 1px solid #3a4656;
         border-radius: 5px;
         color: #e1e4e8;
         font-family: inherit;
@@ -1314,7 +1263,7 @@ export default {
 .raw-env-button {
     background: transparent;
     border: 0;
-    color: #9ca4af;
+    color: #8fbcff;
     font-size: 12px;
     padding: 11px;
 }
@@ -1327,11 +1276,57 @@ export default {
 
 .activity-output-shell .terminal { height: 250px; }
 
+.update-output-shell {
+    background: #080b10;
+    border: 1px solid #35404d;
+    border-left: 3px solid #f0b35a;
+    border-radius: 7px;
+    overflow: hidden;
+
+    .terminal {
+        height: 190px;
+    }
+}
+
+.update-output-heading {
+    align-items: center;
+    background: #11161d;
+    border-bottom: 1px solid #303946;
+    display: flex;
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 7px 11px;
+
+    div {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+    }
+
+    strong {
+        color: #edf2f7;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    > span {
+        color: #a2afbf;
+        font-size: 10px;
+    }
+}
+
+.output-status-dot {
+    background: #f0b35a;
+    border-radius: 50%;
+    height: 7px;
+    width: 7px;
+}
+
 .activity-output-heading {
     min-height: 48px;
 
     span {
-        color: #69c590;
+        color: #75dfa9;
         font-size: 12px;
     }
 }
@@ -1365,14 +1360,15 @@ export default {
     padding: 0;
 
     &.edit-mode {
-        background-color: #12151a !important;
+        background-color: #0c1118 !important;
+        box-shadow: inset 3px 0 0 #6ea8fe;
     }
 
     position: relative;
 }
 
 :deep(.editor-box .cm-editor) {
-    background: #101216;
+    background: #0b0f15;
     height: 340px;
 }
 
@@ -1382,9 +1378,9 @@ export default {
 }
 
 :deep(.editor-box .cm-gutters) {
-    background: #13161a;
-    border-right-color: #252930;
-    color: #68717d;
+    background: #10151c;
+    border-right-color: #303846;
+    color: #8390a1;
 }
 
 .expand-button {
@@ -1393,6 +1389,7 @@ export default {
     right: 15px;
     top: 15px;
     z-index: 10;
+    color: #9badc1;
 }
 
 .expand-button svg {
@@ -1405,7 +1402,7 @@ export default {
 }
 
 .agent-name {
-    color: #929aa5;
+    color: #a4b0bf;
     font-size: 11px;
 }
 

@@ -359,7 +359,20 @@ optgroup {
     .form-select,
     .form-select:focus {
         color: $dark-font-color;
-        background-color: #101216;
+        background-color: #0d1117;
+    }
+
+    .form-label {
+        color: #c8d2de;
+    }
+
+    .form-text {
+        color: #97a5b7;
+    }
+
+    .form-control::placeholder {
+        color: #7f8da0;
+        opacity: 1;
     }
 
     .form-select:disabled {
@@ -396,7 +409,7 @@ optgroup {
     }
 
     .bg-primary {
-        color: $dark-font-color2;
+        color: #07111f;
         background: $primary-gradient;
     }
 
@@ -405,16 +418,16 @@ optgroup {
     }
 
     .btn-normal {
-        $bg-color: #24221e;
+        $bg-color: #1a2029;
 
         color: $dark-font-color;
         background-color: $bg-color;
-        border-color: $bg-color;
+        border-color: #374252;
 
         &:hover {
-            $hover-color: darken($bg-color, 3%);
+            $hover-color: #222b37;
             background-color: $hover-color;
-            border-color: $hover-color;
+            border-color: #4b5a6d;
         }
     }
 

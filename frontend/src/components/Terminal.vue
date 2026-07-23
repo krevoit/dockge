@@ -56,6 +56,11 @@ export default {
             default: TERMINAL_COLS,
         },
 
+        fontSize: {
+            type: Number,
+            default: 13,
+        },
+
         // Mode
         // displayOnly: Only display terminal output
         // mainTerminal: Allow input limited commands and output
@@ -75,6 +80,8 @@ export default {
             clipboardTargets: [],
             lastNativePasteAt: 0,
             pasteFallbackTimer: null,
+            resizeObserver: null,
+            resizeFrame: null,
         };
     },
     created() {
@@ -88,11 +95,40 @@ export default {
         }
 
         this.terminal = new Terminal({
-            fontSize: 14,
+            allowTransparency: false,
+            convertEol: true,
+            fontSize: this.fontSize,
             fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: "400",
+            fontWeightBold: "600",
+            letterSpacing: 0,
+            lineHeight: 1.25,
             cursorBlink,
             cols: this.cols,
             rows: this.rows,
+            theme: {
+                background: "#080b10",
+                foreground: "#dce5ef",
+                cursor: "#8fbcff",
+                cursorAccent: "#080b10",
+                selectionBackground: "#29486f",
+                black: "#394250",
+                red: "#ff6b78",
+                green: "#5bd69a",
+                yellow: "#f0b35a",
+                blue: "#6ea8fe",
+                magenta: "#b89cff",
+                cyan: "#4fd1c5",
+                white: "#dce5ef",
+                brightBlack: "#7d8998",
+                brightRed: "#ff8993",
+                brightGreen: "#7ae4ad",
+                brightYellow: "#f6c778",
+                brightBlue: "#91bdff",
+                brightMagenta: "#ccb8ff",
+                brightCyan: "#79ded5",
+                brightWhite: "#ffffff",
+            },
         });
 
         if (this.mode === "mainTerminal") {
@@ -144,10 +180,14 @@ export default {
         }
         // Fit the terminal width to the div container size after terminal is created.
         this.updateTerminalSize();
+        this.resizeObserver = new ResizeObserver(() => this.scheduleTerminalFit());
+        this.resizeObserver.observe(this.$refs.terminal);
     },
 
     unmounted() {
         window.removeEventListener("resize", this.onResizeEvent);
+        this.resizeObserver?.disconnect();
+        cancelAnimationFrame(this.resizeFrame);
         clearTimeout(this.pasteFallbackTimer);
         this.detachClipboardHandlers();
         this.$root.unbindTerminal(this.name);
@@ -298,16 +338,29 @@ export default {
                 this.terminal.loadAddon(this.terminalFitAddOn);
                 window.addEventListener("resize", this.onResizeEvent);
             }
-            this.terminalFitAddOn.fit();
+            this.scheduleTerminalFit();
+        },
+        scheduleTerminalFit() {
+            cancelAnimationFrame(this.resizeFrame);
+            this.resizeFrame = requestAnimationFrame(() => {
+                const host = this.$refs.terminal;
+                if (!host || host.clientWidth === 0 || host.clientHeight === 0) {
+                    return;
+                }
+                this.terminalFitAddOn.fit();
+                this.emitTerminalSize();
+            });
+        },
+        emitTerminalSize() {
+            const rows = this.terminal.rows;
+            const cols = this.terminal.cols;
+            this.$root.emitAgent(this.endpoint, "terminalResize", this.name, rows, cols);
         },
         /**
          * Handles the resize event of the terminal component.
          */
         onResizeEvent() {
-            this.terminalFitAddOn.fit();
-            let rows = this.terminal.rows;
-            let cols = this.terminal.cols;
-            this.$root.emitAgent(this.endpoint, "terminalResize", this.name, rows, cols);
+            this.scheduleTerminalFit();
         },
 
         isInputMode() {
@@ -504,7 +557,7 @@ export default {
 
 <style lang="scss">
 .terminal {
-    background-color: black !important;
+    background-color: #080b10 !important;
     height: 100%;
     max-width: 100%;
     min-width: 0;
