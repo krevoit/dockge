@@ -143,9 +143,18 @@
                         />
                     </div>
                 </section>
-                <section class="configuration-shell">
+                <section
+                    class="configuration-shell"
+                    :class="{ collapsed: !configurationExpanded }"
+                    @beforeinput.capture="guardReadonlyConfiguration"
+                    @drop.capture="guardReadonlyConfiguration"
+                    @paste.capture="guardReadonlyConfiguration"
+                >
                     <div class="configuration-heading">
-                        <h2>Configuration</h2>
+                        <div class="configuration-title">
+                            <h2>Configuration</h2>
+                            <span>Compose &amp; environment</span>
+                        </div>
                         <div class="configuration-state">
                             <span v-if="!isEditMode"><font-awesome-icon icon="check" /> Saved</span>
                             <button v-if="!isEditMode" class="btn btn-normal" @click="enableEditMode">
@@ -154,9 +163,19 @@
                             <button v-else class="btn btn-primary" :disabled="processing" @click="deployStack">
                                 <font-awesome-icon icon="save" class="me-1" /> Apply changes
                             </button>
+                            <button
+                                class="btn btn-normal configuration-toggle"
+                                type="button"
+                                :aria-expanded="configurationExpanded"
+                                :aria-label="configurationExpanded ? 'Collapse configuration' : 'Expand configuration'"
+                                @click="configurationExpanded = !configurationExpanded"
+                            >
+                                <font-awesome-icon :icon="configurationExpanded ? 'chevron-up' : 'chevron-down'" />
+                                {{ configurationExpanded ? 'Hide files' : 'Show files' }}
+                            </button>
                         </div>
                     </div>
-                    <div class="configuration-grid">
+                    <div v-show="configurationExpanded" class="configuration-grid">
                         <div class="compose-pane">
                             <!-- Override YAML editor (only show if file exists) -->
                             <div v-if="stack.composeOverrideYAML && stack.composeOverrideYAML.trim() !== ''">
@@ -167,14 +186,16 @@
                                     </button>
                                     <code-mirror
                                         ref="overrideEditor"
-                                        v-model="stack.composeOverrideYAML"
+                                        :model-value="stack.composeOverrideYAML"
                                         :extensions="extensions"
                                         minimal
                                         wrap
                                         dark
                                         tab
                                         :disabled="!isEditMode"
+                                        :readonly="!isEditMode"
                                         :hasFocus="editorFocus"
+                                        @update:model-value="updateComposeOverrideYAML"
                                         @change="yamlCodeChange"
                                     />
                                 </div>
@@ -190,14 +211,16 @@
                                     <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                                         <code-mirror
                                             ref="editor"
-                                            v-model="stack.composeOverrideYAML"
+                                            :model-value="stack.composeOverrideYAML"
                                             :extensions="extensions"
                                             minimal
                                             wrap
                                             dark
                                             tab
                                             :disabled="!isEditMode"
+                                            :readonly="!isEditMode"
                                             :hasFocus="editorFocus"
+                                            @update:model-value="updateComposeOverrideYAML"
                                             @change="yamlCodeChange"
                                         />
                                     </div>
@@ -216,14 +239,16 @@
                                 </button>
                                 <code-mirror
                                     ref="editor"
-                                    v-model="stack.composeYAML"
+                                    :model-value="stack.composeYAML"
                                     :extensions="extensions"
                                     minimal
                                     wrap
                                     dark
                                     tab
                                     :disabled="!isEditMode"
+                                    :readonly="!isEditMode"
                                     :hasFocus="editorFocus"
+                                    @update:model-value="updateComposeYAML"
                                     @change="yamlCodeChange"
                                 />
                             </div>
@@ -236,14 +261,16 @@
                                 <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                                     <code-mirror
                                         ref="editor"
-                                        v-model="stack.composeYAML"
+                                        :model-value="stack.composeYAML"
                                         :extensions="extensions"
                                         minimal
                                         wrap
                                         dark
                                         tab
                                         :disabled="!isEditMode"
+                                        :readonly="!isEditMode"
                                         :hasFocus="editorFocus"
+                                        @update:model-value="updateComposeYAML"
                                         @change="yamlCodeChange"
                                     />
                                 </div>
@@ -279,14 +306,16 @@
                                 <div class="shadow-box mb-3 editor-box" :class="{'edit-mode' : isEditMode}">
                                     <code-mirror
                                         ref="editor"
-                                        v-model="stack.composeENV"
+                                        :model-value="stack.composeENV"
                                         :extensions="extensionsEnv"
                                         minimal
                                         wrap
                                         dark
                                         tab
                                         :disabled="!isEditMode"
+                                        :readonly="!isEditMode"
                                         :hasFocus="editorFocus"
+                                        @update:model-value="updateComposeENV"
                                         @change="yamlCodeChange"
                                     />
                                 </div>
@@ -486,6 +515,7 @@ export default {
             dockerStats: {},
             errorDelete: false,
             isEditMode: false,
+            configurationExpanded: false,
             submitted: false,
             showDeleteDialog: false,
             deleteStackFiles: false,
@@ -665,6 +695,7 @@ export default {
         if (this.isAdd) {
             this.processing = false;
             this.isEditMode = true;
+            this.configurationExpanded = true;
 
             let composeYAML;
             let composeENV;
@@ -799,6 +830,9 @@ export default {
                     this.stack = res.stack;
                     this.yamlCodeChange();
                     this.processing = false;
+                    if (!this.isEditMode) {
+                        this.configurationExpanded = false;
+                    }
                     this.bindTerminal();
                 } else {
                     this.$root.toastRes(res);
@@ -844,6 +878,7 @@ export default {
 
                 if (res.ok) {
                     this.isEditMode = false;
+                    this.configurationExpanded = false;
                     this.$router.push(this.url);
                 }
             });
@@ -858,6 +893,7 @@ export default {
 
                 if (res.ok) {
                     this.isEditMode = false;
+                    this.configurationExpanded = false;
                     this.$router.push(this.url);
                 }
             });
@@ -929,8 +965,9 @@ export default {
         },
 
         discardStack() {
-            this.loadStack();
             this.isEditMode = false;
+            this.configurationExpanded = false;
+            this.loadStack();
         },
 
         yamlToJSON(yaml) {
@@ -986,6 +1023,32 @@ export default {
 
         enableEditMode() {
             this.isEditMode = true;
+            this.configurationExpanded = true;
+        },
+
+        guardReadonlyConfiguration(event) {
+            if (!this.isEditMode) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        },
+
+        updateComposeYAML(value) {
+            if (this.isEditMode) {
+                this.stack.composeYAML = value;
+            }
+        },
+
+        updateComposeOverrideYAML(value) {
+            if (this.isEditMode) {
+                this.stack.composeOverrideYAML = value;
+            }
+        },
+
+        updateComposeENV(value) {
+            if (this.isEditMode) {
+                this.stack.composeENV = value;
+            }
         },
 
         checkYAML() {
@@ -1138,6 +1201,21 @@ export default {
     }
 }
 
+.configuration-shell.collapsed .configuration-heading {
+    border-bottom: 0;
+}
+
+.configuration-title {
+    align-items: baseline;
+    display: flex;
+    gap: 9px;
+
+    > span {
+        color: #9eacbd;
+        font-size: 11px;
+    }
+}
+
 .section-heading > div,
 .activity-output-heading > div {
     align-items: center;
@@ -1168,6 +1246,14 @@ export default {
         color: #75dfa9;
         font-size: 12px;
     }
+}
+
+.configuration-toggle {
+    align-items: center;
+    display: inline-flex;
+    gap: 7px;
+    min-width: 94px;
+    justify-content: center;
 }
 
 .configuration-grid {
@@ -1440,7 +1526,8 @@ export default {
     }
 
     .stack-actions { justify-content: flex-start; }
-    .configuration-heading { align-items: flex-start; gap: 8px; }
+    .configuration-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .configuration-title { align-items: flex-start; flex-direction: column; gap: 2px; }
     .configuration-state { flex-wrap: wrap; justify-content: flex-end; }
 }
 </style>
