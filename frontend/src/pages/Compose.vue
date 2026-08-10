@@ -99,9 +99,14 @@
             <div v-if="stack.isManagedByDockge" class="stack-content-layout">
                 <section class="services-section">
                     <!-- General -->
-                    <div v-if="isAdd">
-                        <h4 class="mb-3">{{ $t("general") }}</h4>
-                        <div class="shadow-box big-padding mb-3">
+                    <div v-if="isAdd" class="create-stack-general">
+                        <div class="section-heading create-stack-general-heading">
+                            <div>
+                                <h2>{{ $t("general") }}</h2>
+                                <span>Stack details</span>
+                            </div>
+                        </div>
+                        <div class="create-stack-fields">
                             <!-- Stack Name -->
                             <div>
                                 <label for="name" class="form-label">{{ $t("stackName") }}</label>
@@ -110,9 +115,9 @@
                             </div>
 
                             <!-- Endpoint -->
-                            <div class="mt-3">
-                                <label for="name" class="form-label">{{ $t("dockgeAgent") }}</label>
-                                <select v-model="stack.endpoint" class="form-select">
+                            <div>
+                                <label for="endpoint" class="form-label">{{ $t("dockgeAgent") }}</label>
+                                <select id="endpoint" v-model="stack.endpoint" class="form-select">
                                     <option v-for="(agent, agentEndpoint) in $root.agentList" :key="agentEndpoint" :value="agentEndpoint" :disabled="$root.agentStatusList[agentEndpoint] != 'online'">
                                         ({{ $root.agentStatusList[agentEndpoint] }}) {{ (agent.name !== '') ? agent.name : agent.url || $t("Current") }}
                                     </option>
@@ -137,6 +142,7 @@
                             :serviceStatus="serviceStatusList[name]"
                             :dockerStats="dockerStats"
                             :update-services="globalStack?.updateServices || []"
+                            :runtime-actions="!isAdd"
                             @start-service="startService"
                             @stop-service="stopService"
                             @restart-service="restartService"
@@ -159,9 +165,6 @@
                             <span v-if="!isEditMode"><font-awesome-icon icon="check" /> Saved</span>
                             <button v-if="!isEditMode" class="btn btn-normal" @click="enableEditMode">
                                 <font-awesome-icon icon="pen" class="me-1" /> {{ $t("editStack") }}
-                            </button>
-                            <button v-else class="btn btn-primary" :disabled="processing" @click="deployStack">
-                                <font-awesome-icon icon="save" class="me-1" /> Apply changes
                             </button>
                             <button
                                 class="btn btn-normal configuration-toggle"
@@ -1237,6 +1240,17 @@ export default {
     padding-top: 10px;
 }
 
+.create-stack-fields {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+    padding: 12px;
+}
+
+.create-stack-general-heading {
+    border-top: 0;
+}
+
 .configuration-state {
     align-items: center;
     display: flex;
@@ -1529,5 +1543,6 @@ export default {
     .configuration-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
     .configuration-title { align-items: flex-start; flex-direction: column; gap: 2px; }
     .configuration-state { flex-wrap: wrap; justify-content: flex-end; }
+    .create-stack-fields { grid-template-columns: 1fr; }
 }
 </style>

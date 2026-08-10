@@ -21,7 +21,7 @@
                 </div>
             </div>
 
-            <div class="function">
+            <div v-if="runtimeActions" class="function">
                 <div class="action-group" role="group">
                     <router-link v-if="status === 'running' || status === 'healthy'" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
                         <font-awesome-icon icon="terminal" />
@@ -118,6 +118,10 @@ export default defineComponent({
         updateServices: {
             type: Array,
             default: () => [],
+        },
+        runtimeActions: {
+            type: Boolean,
+            default: true,
         },
         processing: {
             type: Boolean,

@@ -436,6 +436,19 @@ export default {
             color: $dark-font-color;
             border-color: $dark-border-color;
 
+            .dropdown-item-text {
+                color: #dce3eb !important;
+
+                strong {
+                    color: #ffffff;
+                    font-weight: 650;
+                }
+            }
+
+            .dropdown-divider {
+                border-top-color: #3a4350;
+            }
+
             .dropdown-item {
                 color: $dark-font-color;
 
