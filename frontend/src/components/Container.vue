@@ -21,18 +21,22 @@
                 </div>
             </div>
 
-            <div v-if="runtimeActions" class="function">
+            <div v-if="runtimeActions || creationMode" class="function">
                 <div class="action-group" role="group">
-                    <router-link v-if="status === 'running' || status === 'healthy'" class="btn btn-normal action-btn" :to="terminalRouteLink" disabled="">
+                    <router-link v-if="runtimeActions && (status === 'running' || status === 'healthy')" class="btn btn-normal action-btn" :to="terminalRouteLink" title="Open web terminal">
                         <font-awesome-icon icon="terminal" />
-                        {{ $t("console") }}
+                        <span>{{ $t("console") }}</span>
                     </router-link>
-                    <router-link class="btn btn-normal action-btn" :to="logsRouteLink">
+                    <button v-else-if="creationMode" class="btn btn-normal action-btn terminal-preview" type="button" disabled title="Deploy the stack to open the web terminal">
+                        <font-awesome-icon icon="terminal" />
+                        <span>Web terminal</span>
+                    </button>
+                    <router-link v-if="runtimeActions" class="btn btn-normal action-btn" :to="logsRouteLink">
                         <font-awesome-icon icon="stream" />
                         {{ $t("logs") }}
                     </router-link>
                     <button
-                        v-if="status !== 'running' && status !== 'healthy'"
+                        v-if="runtimeActions && status !== 'running' && status !== 'healthy'"
                         class="btn btn-primary action-btn"
                         :disabled="processing"
                         @click="startService"
@@ -41,7 +45,7 @@
                         {{ $t("startStack") }}
                     </button>
                     <button
-                        v-if="status === 'running' || status === 'healthy' || status === 'unhealthy'"
+                        v-if="runtimeActions && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
                         class="btn btn-normal action-btn"
                         :disabled="processing"
                         @click="stopService"
@@ -50,7 +54,7 @@
                         {{ $t("stopStack") }}
                     </button>
                     <button
-                        v-if="status === 'running' || status === 'healthy' || status === 'unhealthy'"
+                        v-if="runtimeActions && (status === 'running' || status === 'healthy' || status === 'unhealthy')"
                         class="btn btn-normal action-btn"
                         :disabled="processing"
                         @click="restartService"
@@ -122,6 +126,10 @@ export default defineComponent({
         runtimeActions: {
             type: Boolean,
             default: true,
+        },
+        creationMode: {
+            type: Boolean,
+            default: false,
         },
         processing: {
             type: Boolean,
@@ -375,6 +383,11 @@ export default defineComponent({
             height: 0.9rem;
             width: 0.9rem;
         }
+    }
+
+    .terminal-preview {
+        cursor: not-allowed;
+        opacity: 0.72;
     }
 
     .update-indicator {

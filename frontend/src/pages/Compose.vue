@@ -130,8 +130,12 @@
                     <div class="section-heading">
                         <div>
                             <h2>{{ $tc("container", 2) }}</h2>
-                            <span>{{ Object.keys(jsonConfig.services || {}).length }}</span>
+                            <span>{{ Object.keys(jsonConfig.services || {}).length }} · Compose services</span>
                         </div>
+                        <button v-if="isEditMode" class="btn btn-primary add-container-button" type="button" @click="openContainerBuilder">
+                            <font-awesome-icon icon="plus" class="me-1" />
+                            {{ $t("addContainer") }}
+                        </button>
                     </div>
 
                     <div ref="containerList" class="container-list">
@@ -143,6 +147,7 @@
                             :dockerStats="dockerStats"
                             :update-services="globalStack?.updateServices || []"
                             :runtime-actions="!isAdd"
+                            :creation-mode="isAdd"
                             @start-service="startService"
                             @stop-service="stopService"
                             @restart-service="restartService"
@@ -367,6 +372,112 @@
                 {{ $t("stackNotManagedByDockgeMsg") }}
             </div>
 
+            <!-- Compose-first container builder. Existing services remain editable in YAML only. -->
+            <BModal v-model="containerBuilderOpen" title="Add container" size="lg" scrollable hide-footer>
+                <form class="container-builder" @submit.prevent="createContainer">
+                    <div class="builder-intro">
+                        <div class="builder-intro-icon"><font-awesome-icon icon="plus-circle" /></div>
+                        <div>
+                            <h3>New compose service</h3>
+                            <p>Set the common options here and Dockge will add the service to your compose file.</p>
+                        </div>
+                    </div>
+
+                    <div class="builder-section">
+                        <div class="builder-section-heading">
+                            <span>Basics</span>
+                            <small>Required to create the service</small>
+                        </div>
+                        <div class="builder-grid builder-grid-two">
+                            <div>
+                                <label for="container-service-name" class="form-label">Service name</label>
+                                <input id="container-service-name" v-model="containerDraft.name" class="form-control" type="text" placeholder="web" autocomplete="off" required />
+                            </div>
+                            <div>
+                                <label for="container-image" class="form-label">Docker image</label>
+                                <input id="container-image" v-model="containerDraft.image" class="form-control" type="text" placeholder="nginx:latest" autocomplete="off" />
+                            </div>
+                        </div>
+                        <div class="builder-grid builder-grid-two builder-grid-compact">
+                            <div>
+                                <label for="container-restart" class="form-label">Restart policy</label>
+                                <select id="container-restart" v-model="containerDraft.restart" class="form-select">
+                                    <option value="unless-stopped">Unless stopped</option>
+                                    <option value="always">Always</option>
+                                    <option value="on-failure">On failure</option>
+                                    <option value="no">Never</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="container-network-mode" class="form-label">Network mode</label>
+                                <select id="container-network-mode" v-model="containerDraft.networkMode" class="form-select">
+                                    <option value="">Compose network (default)</option>
+                                    <option value="host">Host</option>
+                                    <option value="none">None</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="container-command" class="form-label">Command <span class="form-hint">optional</span></label>
+                            <input id="container-command" v-model="containerDraft.command" class="form-control" type="text" placeholder="Leave blank to use the image default" autocomplete="off" />
+                        </div>
+                    </div>
+
+                    <div class="builder-section">
+                        <div class="builder-section-heading">
+                            <span>Connectivity &amp; storage</span>
+                            <small>One short-syntax entry per line</small>
+                        </div>
+                        <div class="builder-grid builder-grid-two">
+                            <div>
+                                <label for="container-ports" class="form-label">Ports</label>
+                                <textarea id="container-ports" v-model="containerDraft.ports" class="form-control builder-textarea" rows="3" placeholder="8080:80&#10;8443:443" spellcheck="false"></textarea>
+                            </div>
+                            <div>
+                                <label for="container-volumes" class="form-label">Volumes</label>
+                                <textarea id="container-volumes" v-model="containerDraft.volumes" class="form-control builder-textarea" rows="3" placeholder="./data:/var/lib/app" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                        <div class="builder-grid builder-grid-two">
+                            <div>
+                                <label for="container-networks" class="form-label">Networks</label>
+                                <textarea id="container-networks" v-model="containerDraft.networks" class="form-control builder-textarea" rows="3" list="compose-network-suggestions" placeholder="frontend&#10;backend" spellcheck="false" :disabled="Boolean(containerDraft.networkMode)"></textarea>
+                                <datalist id="compose-network-suggestions">
+                                    <option v-for="networkName in networkSuggestions" :key="networkName" :value="networkName" />
+                                </datalist>
+                                <div class="form-text">{{ containerDraft.networkMode ? "Network mode overrides service networks." : "New names are declared as internal compose networks automatically." }}</div>
+                            </div>
+                            <div>
+                                <label for="container-depends-on" class="form-label">Depends on</label>
+                                <textarea id="container-depends-on" v-model="containerDraft.dependsOn" class="form-control builder-textarea" rows="3" placeholder="database&#10;redis" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="builder-section">
+                        <div class="builder-section-heading">
+                            <span>Environment</span>
+                            <small>KEY=VALUE, one per line</small>
+                        </div>
+                        <label for="container-environment" class="visually-hidden">Environment variables</label>
+                        <textarea id="container-environment" v-model="containerDraft.environment" class="form-control builder-textarea" rows="4" placeholder="APP_ENV=production&#10;PORT=8080" spellcheck="false"></textarea>
+                    </div>
+
+                    <div class="builder-terminal-note">
+                        <font-awesome-icon icon="terminal" />
+                        <span><strong>Web terminal</strong> is available from this service card once the stack is deployed and running.</span>
+                    </div>
+
+                    <div class="builder-actions">
+                        <button class="btn btn-normal" type="button" @click="containerBuilderOpen = false">Cancel</button>
+                        <button class="btn btn-primary" type="submit">
+                            <font-awesome-icon icon="plus" class="me-1" />
+                            Add container
+                        </button>
+                    </div>
+                </form>
+            </BModal>
+
             <!-- Delete Dialog -->
             <BModal v-model="showDeleteDialog" :cancelTitle="$t('cancel')" :okTitle="$t('deleteStack')" okVariant="danger" @ok="deleteDialog">
                 {{ $t("deleteStackMsg") }}
@@ -525,6 +636,19 @@ export default {
             showForceDeleteDialog: false,
             outputVisible: true,
             outputExpanded: false,
+            containerBuilderOpen: false,
+            containerDraft: {
+                name: "",
+                image: "",
+                restart: "unless-stopped",
+                networkMode: "",
+                command: "",
+                ports: "",
+                volumes: "",
+                networks: "",
+                dependsOn: "",
+                environment: "",
+            },
             stopServiceStatusTimeout: false,
             stopDockerStatsTimeout: false,
         };
@@ -605,6 +729,10 @@ export default {
 
         networks() {
             return this.jsonConfig.networks;
+        },
+
+        networkSuggestions() {
+            return Object.keys(this.jsonConfig.networks || {});
         },
 
         endpoint() {
@@ -1058,6 +1186,100 @@ export default {
             // TODO: implement validation
         },
 
+        openContainerBuilder() {
+            this.containerDraft = {
+                name: "",
+                image: "",
+                restart: "unless-stopped",
+                networkMode: "",
+                command: "",
+                ports: "",
+                volumes: "",
+                networks: "",
+                dependsOn: "",
+                environment: "",
+            };
+            this.containerBuilderOpen = true;
+        },
+
+        createContainer() {
+            const name = this.containerDraft.name.trim();
+
+            if (!name) {
+                this.$root.toastError("Container name cannot be empty");
+                return;
+            }
+
+            if (this.jsonConfig.services?.[name]) {
+                this.$root.toastError("Container name already exists");
+                return;
+            }
+
+            const toList = (value) => value
+                .split(/\r?\n/)
+                .map(item => item.trim())
+                .filter(Boolean);
+
+            const service = {
+                restart: this.containerDraft.restart || "unless-stopped",
+            };
+
+            if (this.containerDraft.image.trim()) {
+                service.image = this.containerDraft.image.trim();
+            }
+
+            if (this.containerDraft.command.trim()) {
+                service.command = this.containerDraft.command.trim();
+            }
+
+            const ports = toList(this.containerDraft.ports);
+            const volumes = toList(this.containerDraft.volumes);
+            const networks = toList(this.containerDraft.networks);
+            const dependsOn = toList(this.containerDraft.dependsOn);
+            const environment = toList(this.containerDraft.environment);
+
+            if (ports.length > 0) {
+                service.ports = ports;
+            }
+            if (volumes.length > 0) {
+                service.volumes = volumes;
+            }
+            if (environment.length > 0) {
+                service.environment = environment;
+            }
+            if (dependsOn.length > 0) {
+                service.depends_on = dependsOn;
+            }
+            if (networks.length > 0 && !this.containerDraft.networkMode) {
+                service.networks = networks;
+                if (!this.jsonConfig.networks) {
+                    this.jsonConfig.networks = {};
+                }
+                for (const networkName of networks) {
+                    if (!this.jsonConfig.networks[networkName]) {
+                        this.jsonConfig.networks[networkName] = {};
+                    }
+                }
+            }
+            if (this.containerDraft.networkMode) {
+                service.network_mode = this.containerDraft.networkMode;
+            }
+
+            if (!this.jsonConfig.services) {
+                this.jsonConfig.services = {};
+            }
+            this.jsonConfig.services[name] = service;
+            this.containerBuilderOpen = false;
+
+            this.$nextTick(() => {
+                const element = this.$refs.containerList?.lastElementChild;
+                element?.scrollIntoView({
+                    block: "start",
+                    behavior: "smooth",
+                });
+            });
+        },
+
         stackNameToLowercase() {
             this.stack.name = this.stack?.name?.toLowerCase();
         },
@@ -1238,6 +1460,153 @@ export default {
 
 .container-list {
     padding-top: 10px;
+}
+
+.add-container-button {
+    align-items: center;
+    display: inline-flex;
+    font-size: 12px;
+    min-height: 31px;
+}
+
+.container-builder {
+    color: #dce4ed;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    .form-label {
+        color: #dce4ed;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+
+    .form-control,
+    .form-select {
+        background-color: #111923;
+        border-color: #3a4a5b;
+        color: #e7edf4;
+        font-size: 13px;
+        min-height: 37px;
+
+        &:focus {
+            background-color: #111923;
+            border-color: #7da8d8;
+            box-shadow: 0 0 0 2px rgba(125, 168, 216, 0.18);
+            color: #f5f8fb;
+        }
+
+        &::placeholder { color: #738297; }
+    }
+
+    .builder-textarea {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        min-height: 88px;
+        resize: vertical;
+    }
+
+    .form-text,
+    .form-hint {
+        color: #8d9caf;
+        font-size: 11px;
+    }
+}
+
+.builder-intro {
+    align-items: flex-start;
+    background: #151f2c;
+    border: 1px solid #314457;
+    border-radius: 8px;
+    display: flex;
+    gap: 11px;
+    padding: 12px;
+
+    h3 {
+        color: #f2f6fa;
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 3px;
+    }
+
+    p {
+        color: #a7b5c5;
+        font-size: 12px;
+        line-height: 1.45;
+        margin: 0;
+    }
+}
+
+.builder-intro-icon {
+    align-items: center;
+    background: rgba(110, 168, 254, 0.14);
+    border: 1px solid rgba(110, 168, 254, 0.3);
+    border-radius: 7px;
+    color: #9cc4f6;
+    display: inline-flex;
+    flex: 0 0 31px;
+    height: 31px;
+    justify-content: center;
+}
+
+.builder-section {
+    background: #101722;
+    border: 1px solid #2d3c4c;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 13px;
+}
+
+.builder-section-heading {
+    align-items: baseline;
+    display: flex;
+    gap: 9px;
+
+    span {
+        color: #edf2f7;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    small {
+        color: #8696a8;
+        font-size: 10px;
+    }
+}
+
+.builder-grid {
+    display: grid;
+    gap: 11px;
+}
+
+.builder-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.builder-grid-compact { margin-top: -1px; }
+
+.builder-terminal-note {
+    align-items: center;
+    background: rgba(91, 214, 154, 0.08);
+    border: 1px solid rgba(91, 214, 154, 0.22);
+    border-radius: 7px;
+    color: #a9cdb8;
+    display: flex;
+    font-size: 11px;
+    gap: 8px;
+    line-height: 1.45;
+    padding: 9px 11px;
+
+    svg { color: #70d39b; }
+    strong { color: #d3f0df; font-weight: 600; }
+}
+
+.builder-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 2px;
 }
 
 .create-stack-fields {
@@ -1544,5 +1913,6 @@ export default {
     .configuration-title { align-items: flex-start; flex-direction: column; gap: 2px; }
     .configuration-state { flex-wrap: wrap; justify-content: flex-end; }
     .create-stack-fields { grid-template-columns: 1fr; }
+    .builder-grid-two { grid-template-columns: 1fr; }
 }
 </style>
