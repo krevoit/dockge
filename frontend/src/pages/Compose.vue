@@ -143,15 +143,38 @@
                             v-for="(service, name) in jsonConfig.services"
                             :key="name"
                             :name="name"
+                            :is-edit-mode="isEditMode"
                             :serviceStatus="serviceStatusList[name]"
                             :dockerStats="dockerStats"
                             :update-services="globalStack?.updateServices || []"
-                            :runtime-actions="!isAdd"
+                            :runtime-actions="!isAdd && !isEditMode"
                             :creation-mode="isAdd"
                             @start-service="startService"
                             @stop-service="stopService"
                             @restart-service="restartService"
                         />
+                    </div>
+
+                    <!-- next-dev restored: stack-level URLs + Networks (upstream feature).
+                         Container builder modal handles per-service nets; this handles
+                         top-level `networks:` + `x-dockge.urls` without raw YAML. -->
+                    <div v-if="isEditMode" class="stack-extras">
+                        <div class="section-heading">
+                            <div>
+                                <h2>{{ $t("extra") }}</h2>
+                                <span>URLs &amp; networks</span>
+                            </div>
+                        </div>
+                        <div class="shadow-box big-padding mb-3">
+                            <div class="mb-4">
+                                <label class="form-label">{{ $tc("url", 2) }}</label>
+                                <ArrayInput name="urls" :display-name="$t('url')" placeholder="https://" object-type="x-dockge" />
+                            </div>
+                        </div>
+                        <h4 class="mb-3">{{ $tc("network", 2) }}</h4>
+                        <div class="shadow-box big-padding mb-3">
+                            <NetworkInput />
+                        </div>
                     </div>
                 </section>
                 <section
@@ -446,6 +469,14 @@
                                     <option v-for="networkName in networkSuggestions" :key="networkName" :value="networkName" />
                                 </datalist>
                                 <div class="form-text">{{ containerDraft.networkMode ? "Network mode overrides service networks." : "New names are declared as internal compose networks automatically." }}</div>
+                                <!-- next-dev restored: pick existing host networks as external -->
+                                <div v-if="hostNetworkList.length > 0" class="external-networks">
+                                    <div class="form-text mb-1">Attach existing host network as external:</div>
+                                    <label v-for="net in hostNetworkList" :key="net" class="form-check">
+                                        <input v-model="builderExternalNetworks" :value="net" class="form-check-input" type="checkbox" :disabled="Boolean(containerDraft.networkMode)" />
+                                        <span class="form-check-label">{{ net }}</span>
+                                    </label>
+                                </div>
                             </div>
                             <div>
                                 <label for="container-depends-on" class="form-label">Depends on</label>
@@ -514,6 +545,8 @@ import {
     RUNNING
 } from "../../../common/util-common";
 import { BModal } from "bootstrap-vue-next";
+import NetworkInput from "../components/NetworkInput.vue";
+import ArrayInput from "../components/ArrayInput.vue";
 import dotenv from "dotenv";
 import { ref } from "vue";
 
@@ -571,6 +604,8 @@ const variableHighlight = ViewPlugin.fromClass(class {
 
 export default {
     components: {
+        NetworkInput,
+        ArrayInput,
         FontAwesomeIcon,
         CodeMirror,
         BModal,
@@ -637,6 +672,8 @@ export default {
             outputVisible: true,
             outputExpanded: false,
             containerBuilderOpen: false,
+            hostNetworkList: [],
+            builderExternalNetworks: [],
             containerDraft: {
                 name: "",
                 image: "",
@@ -1199,7 +1236,26 @@ export default {
                 dependsOn: "",
                 environment: "",
             };
+            this.builderExternalNetworks = [];
             this.containerBuilderOpen = true;
+            this.loadHostNetworks();
+        },
+
+        loadHostNetworks() {
+            this.$root.emitAgent(this.endpoint, "getDockerNetworkList", (res) => {
+                if (res.ok && Array.isArray(res.dockerNetworkList)) {
+                    const prefix = (this.stack?.name || "") + "_";
+                    this.hostNetworkList = res.dockerNetworkList.filter((n) => {
+                        if (prefix && n.startsWith(prefix)) {
+                            return false;
+                        }
+                        if (n === "none" || n === "host" || n === "bridge") {
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+            });
         },
 
         createContainer() {
@@ -1234,7 +1290,7 @@ export default {
 
             const ports = toList(this.containerDraft.ports);
             const volumes = toList(this.containerDraft.volumes);
-            const networks = toList(this.containerDraft.networks);
+            const networks = [ ...toList(this.containerDraft.networks), ...(this.builderExternalNetworks || []) ];
             const dependsOn = toList(this.containerDraft.dependsOn);
             const environment = toList(this.containerDraft.environment);
 
@@ -1255,9 +1311,12 @@ export default {
                 if (!this.jsonConfig.networks) {
                     this.jsonConfig.networks = {};
                 }
+                const externalSet = new Set(this.builderExternalNetworks || []);
                 for (const networkName of networks) {
                     if (!this.jsonConfig.networks[networkName]) {
-                        this.jsonConfig.networks[networkName] = {};
+                        this.jsonConfig.networks[networkName] = externalSet.has(networkName) ? { external: true } : {};
+                    } else if (externalSet.has(networkName)) {
+                        this.jsonConfig.networks[networkName] = { ...(this.jsonConfig.networks[networkName] || {}), external: true };
                     }
                 }
             }

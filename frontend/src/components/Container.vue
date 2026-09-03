@@ -66,7 +66,17 @@
             </div>
         </div>
 
-        <div v-if="statsInstances.length > 0" class="mt-2">
+        <div v-if="isEditMode" class="mt-2">
+            <button class="btn btn-normal me-2" @click="showConfig = !showConfig">
+                <font-awesome-icon icon="edit" />
+                {{ $t("Edit") }}
+            </button>
+            <button class="btn btn-danger me-2" @click="remove">
+                <font-awesome-icon icon="trash" />
+                {{ $t("deleteContainer") }}
+            </button>
+        </div>
+        <div v-else-if="statsInstances.length > 0" class="mt-2">
             <div class="d-flex align-items-center gap-3">
                 <template v-if="!expandedStats">
                     <div class="stats">
@@ -92,6 +102,53 @@
                 </div>
             </transition>
         </div>
+
+        <!-- next-dev restored: per-service GUI editing (upstream feature).
+             Works on jsonConfig.services[name] via ArrayInput/ArraySelect. -->
+        <transition name="slide-fade" appear>
+            <div v-if="isEditMode && showConfig" class="config mt-3">
+                <div class="mb-4">
+                    <label class="form-label">{{ $t("dockerImage") }}</label>
+                    <input v-model="service.image" class="form-control" list="image-datalist" placeholder="nginx:latest" />
+                    <datalist id="image-datalist">
+                        <option value="louislam/uptime-kuma:1" />
+                    </datalist>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $tc("port", 2) }}</label>
+                    <ArrayInput name="ports" :display-name="$t('port')" placeholder="HOST:CONTAINER" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $tc("volume", 2) }}</label>
+                    <ArrayInput name="volumes" :display-name="$t('volume')" placeholder="HOST:CONTAINER" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $t("restartPolicy") }}</label>
+                    <select v-model="service.restart" class="form-select">
+                        <option value="always">{{ $t("restartPolicyAlways") }}</option>
+                        <option value="unless-stopped">{{ $t("restartPolicyUnlessStopped") }}</option>
+                        <option value="on-failure">{{ $t("restartPolicyOnFailure") }}</option>
+                        <option value="no">{{ $t("restartPolicyNo") }}</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $tc("environmentVariable", 2) }}</label>
+                    <ArrayInput name="environment" :display-name="$t('environmentVariable')" placeholder="KEY=VALUE" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $tc("network", 2) }}</label>
+                    <div v-if="networkList.length === 0 && service.networks && service.networks.length > 0" class="text-warning mb-3">
+                        {{ $t("NoNetworksAvailable") }}
+                    </div>
+                    <ArraySelect name="networks" :display-name="$t('network')" placeholder="Network Name" :options="networkList" />
+                    <div class="form-text">Manage stack networks in the Networks section below. External host networks can be attached there.</div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">{{ $t("dependsOn") }}</label>
+                    <ArrayInput name="depends_on" :display-name="$t('dependsOn')" :placeholder="$t('containerName')" />
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
@@ -100,16 +157,24 @@ import { defineComponent } from "vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { parseDockerPort } from "../../../common/util-common";
 import DockerStat from "./DockerStat.vue";
+import ArrayInput from "./ArrayInput.vue";
+import ArraySelect from "./ArraySelect.vue";
 
 export default defineComponent({
     components: {
         FontAwesomeIcon,
-        DockerStat
+        DockerStat,
+        ArrayInput,
+        ArraySelect
     },
     props: {
         name: {
             type: String,
             required: true,
+        },
+        isEditMode: {
+            type: Boolean,
+            default: false,
         },
         serviceStatus: {
             type: Object,
@@ -144,9 +209,14 @@ export default defineComponent({
     data() {
         return {
             expandedStats: false,
+            showConfig: false,
         };
     },
     computed: {
+        networkList() {
+            const nets = this.jsonObject?.networks || {};
+            return Object.keys(nets);
+        },
         bgStyle() {
             if (this.status === "running" || this.status === "healthy") {
                 return "bg-primary";
@@ -289,6 +359,13 @@ export default defineComponent({
                 let hostname = this.$root.info.primaryHostname || location.hostname;
                 return parseDockerPort(port, hostname);
             }
+        },
+        remove() {
+            // next-dev restored: delete service from compose JSON (edit mode)
+            if (!confirm(`Delete container ${this.name}?`)) {
+                return;
+            }
+            delete this.jsonObject.services[this.name];
         },
         startService() {
             this.$emit("start-service", this.name);

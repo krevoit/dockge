@@ -1,4 +1,7 @@
-FROM node:22-bookworm-slim
+# next-dev: pinned minor (was floating `node:22-bookworm-slim`).
+# Pin digest in release CI for full supply-chain pinning:
+#   docker buildx imagetools inspect node:22.14.0-bookworm-slim --format '{{.Manifest.Digest}}'
+FROM node:22.14.0-bookworm-slim
 RUN apt update && apt install --yes --no-install-recommends \
     curl \
     ca-certificates \

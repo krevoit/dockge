@@ -8,6 +8,30 @@ import childProcessAsync from "promisify-child-process";
 type DockerInspectObject = Record<string, unknown>;
 
 export class DockerSocketHandler extends AgentSocketHandler {
+    // next-dev: block flag-injection (`-v`, `--help`) and path-ish names
+    // in docker rm/network/volume/image wrappers. All spawn() calls are
+    // array-form (no shell), but leading `-` still changes CLI semantics.
+    assertSafeDockerName(name : unknown, label = "Name") {
+        if (typeof(name) !== "string" || name.length === 0 || name.length > 256) {
+            throw new ValidationError(`${label} must be a non-empty string`);
+        }
+        if (name.startsWith("-") || name.includes("\0") || name.includes("\n")) {
+            throw new ValidationError(`Invalid ${label.toLowerCase()}`);
+        }
+        if (name.includes("/") && !name.includes(":") && !name.includes("@")) {
+            // Allow image refs like repo/name:tag but not paths
+            throw new ValidationError(`Invalid ${label.toLowerCase()}`);
+        }
+    }
+
+    assertSafeNetworkName(name : unknown) {
+        if (typeof(name) !== "string" || !/^[a-zA-Z0-9_.-]+$/.test(name)) {
+            throw new ValidationError("Network name can only contain letters, numbers, _, - and .");
+        }
+        if (name.startsWith("-") || [ "host", "none" ].includes(name)) {
+            throw new ValidationError("Invalid network name");
+        }
+    }
     create(socket : DockgeSocket, server : DockgeServer, agentSocket : AgentSocket) {
         // Do not call super.create()
 
@@ -386,6 +410,8 @@ export class DockerSocketHandler extends AgentSocketHandler {
                     throw new ValidationError("Resource type and name must be strings");
                 }
 
+                this.assertSafeDockerName(name, "Resource name");
+
                 const commands : Record<string, string[]> = {
                     container: [ "rm", "-f", name ],
                     network: [ "network", "rm", name ],
@@ -422,8 +448,9 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 const data = options as Record<string, unknown>;
                 const name = String(data.name || "").trim();
                 const driver = String(data.driver || "bridge").trim();
-                if (!name) {
-                    throw new ValidationError("Network name is required");
+                this.assertSafeNetworkName(name);
+                if (![ "bridge", "macvlan", "ipvlan", "overlay" ].includes(driver)) {
+                    throw new ValidationError("Unsupported network driver");
                 }
 
                 const args = [ "network", "create", "--driver", driver ];
@@ -477,6 +504,8 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 if (typeof(networkName) !== "string" || typeof(containerName) !== "string") {
                     throw new ValidationError("Network and container names must be strings");
                 }
+                this.assertSafeNetworkName(networkName);
+                this.assertSafeDockerName(containerName, "Container name");
 
                 await this.checkNotDockgeContainer(containerName);
                 await childProcessAsync.spawn("docker", [ "network", "connect", networkName, containerName ], {
@@ -500,6 +529,8 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 if (typeof(networkName) !== "string" || typeof(containerName) !== "string") {
                     throw new ValidationError("Network and container names must be strings");
                 }
+                this.assertSafeNetworkName(networkName);
+                this.assertSafeDockerName(containerName, "Container name");
 
                 await this.checkNotDockgeContainer(containerName);
                 await childProcessAsync.spawn("docker", [ "network", "disconnect", networkName, containerName ], {

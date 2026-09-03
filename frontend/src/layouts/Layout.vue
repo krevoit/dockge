@@ -271,7 +271,9 @@ export default {
 
     .nav-item { margin: 0 !important; }
 
-    .nav-item:not(:last-child) { display: none; }
+    // next-dev: Home/Console/Resources must stay visible on desktop.
+    // Previous `.nav-item:not(:last-child){display:none}` hid the entire
+    // web-terminal + resources nav, making /console unreachable.
 
     .nav-link {
         align-items: center;
@@ -291,8 +293,8 @@ export default {
         svg { font-size: 19px; }
 
         &:hover {
-            background: #e9ebee;
-            color: #1c1f23;
+            background: rgba($primary, 0.12);
+            color: $primary;
         }
 
         &.router-link-exact-active,
@@ -397,7 +399,7 @@ export default {
         padding: 8px;
 
         &:hover {
-            background-color: #e9ebee;
+            background-color: rgba($primary, 0.12);
         }
     }
 
@@ -527,8 +529,6 @@ export default {
     .rail-nav {
         flex: 0 1 auto;
         flex-direction: row;
-
-        .nav-item:not(:last-child) { display: block; }
 
         .nav-link {
             border-bottom: 2px solid transparent;

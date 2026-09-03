@@ -175,6 +175,25 @@ export class DockgeServer {
 
         // Create express
         this.app = express();
+        this.app.disable("x-powered-by");
+
+        // next-dev: minimal security headers (no new dep). API is
+        // socket.io + same-origin frontend; deny framing to block
+        // login clickjacking, narrow CSP for Vite bundle.
+        this.app.use((_req, res, next) => {
+            res.setHeader("X-Content-Type-Options", "nosniff");
+            res.setHeader("X-Frame-Options", "DENY");
+            res.setHeader("Referrer-Policy", "no-referrer");
+            res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+            res.setHeader(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'"
+            );
+            if (this.config.sslKey && this.config.sslCert) {
+                res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+            }
+            next();
+        });
 
         // Create HTTP server
         if (this.config.sslKey && this.config.sslCert) {

@@ -22,6 +22,37 @@ import childProcessAsync from "promisify-child-process";
 import { Settings } from "./settings";
 import { ImageRepository } from "./image-repository";
 
+export const STACK_NAME_REGEX = /^[a-z0-9_-]+$/;
+
+export function assertSafeStackName(name : unknown) : asserts name is string {
+    if (typeof(name) !== "string" || !STACK_NAME_REGEX.test(name)) {
+        throw new ValidationError("Stack name can only contain [a-z][0-9] _ - only");
+    }
+    if (name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
+        throw new ValidationError("Invalid stack name");
+    }
+}
+
+export function assertSafeServiceName(name : unknown) : asserts name is string {
+    if (typeof(name) !== "string" || name.length === 0 || name.length > 128) {
+        throw new ValidationError("Invalid service name");
+    }
+    // Compose service names: lowercase alnum + _ - . ; never allow flags
+    if (name.startsWith("-") || !/^[a-zA-Z0-9_.-]+$/.test(name)) {
+        throw new ValidationError("Invalid service name");
+    }
+}
+
+export function assertSafePath(stacksDir : string, stackName : string) : string {
+    assertSafeStackName(stackName);
+    const root = path.resolve(stacksDir);
+    const resolved = path.resolve(path.join(root, stackName));
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+        throw new ValidationError("Invalid stack name");
+    }
+    return resolved;
+}
+
 // For getSingleComposeStatus and general compose stack objects
 export interface ComposeStack {
     Name: string;
@@ -157,10 +188,9 @@ export class Stack {
     }
 
     validate() {
-        // Check name, allows [a-z][0-9] _ - only
-        if (!this.name.match(/^[a-z0-9_-]+$/)) {
-            throw new ValidationError("Stack name can only contain [a-z][0-9] _ - only");
-        }
+        // Check name, allows [a-z][0-9] _ - only. Centralized so every
+        // entry point (save/getStack/delete) enforces the same rule.
+        assertSafeStackName(this.name);
 
         // Check YAML format
         yaml.parse(this.composeYAML);
@@ -219,7 +249,9 @@ export class Stack {
     }
 
     get path() : string {
-        return path.join(this.server.stacksDir, this.name);
+        // Containment: never resolve outside stacksDir even if caller
+        // passed something like ../../app/data
+        return assertSafePath(this.server.stacksDir, this.name);
     }
 
     get fullPath() : string {
@@ -542,7 +574,10 @@ export class Stack {
     }
 
     static async getStack(server: DockgeServer, stackName: string, skipFSOperations = false) : Promise<Stack> {
-        let dir = path.join(server.stacksDir, stackName);
+        // Critical: validate before any path.join / fs access to block
+        // ../../ traversal via deleteStack/forceDeleteStack/getStack.
+        assertSafeStackName(stackName);
+        let dir = assertSafePath(server.stacksDir, stackName);
 
         if (!skipFSOperations) {
             if (!await fileExists(dir) || !(await fsAsync.stat(dir)).isDirectory()) {
@@ -835,6 +870,7 @@ export class Stack {
     }
 
     async startService(socket: DockgeSocket, serviceName: string) {
+        assertSafeServiceName(serviceName);
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "up", "-d", serviceName ], this.path);
         if (exitCode !== 0) {
@@ -845,6 +881,7 @@ export class Stack {
     }
 
     async stopService(socket: DockgeSocket, serviceName: string): Promise<number> {
+        assertSafeServiceName(serviceName);
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "stop", serviceName ], this.path);
         if (exitCode !== 0) {
@@ -855,6 +892,7 @@ export class Stack {
     }
 
     async restartService(socket: DockgeSocket, serviceName: string): Promise<number> {
+        assertSafeServiceName(serviceName);
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "restart", serviceName ], this.path);
         if (exitCode !== 0) {

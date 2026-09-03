@@ -38,7 +38,11 @@ export class User extends BeanModel {
         return jwt.sign({
             username: user.username,
             h: shake256(user.password, SHAKE256_LENGTH),
-        }, jwtSecret);
+        }, jwtSecret, {
+            // next-dev: bound token lifetime so a stolen localStorage token
+            // is not a forever-admin. Password change still invalidates via `h`.
+            expiresIn: "30d",
+        });
     }
 
 }

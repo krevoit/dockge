@@ -185,103 +185,96 @@ export class MainSocketHandler extends SocketHandler {
 
         // Login
         socket.on("login", async (data, callback) => {
-            const clientIP = await server.getClientIP(socket);
+            try {
+                const clientIP = await server.getClientIP(socket);
 
-            log.info("auth", `Login by username + password. IP=${clientIP}`);
+                log.info("auth", `Login by username + password. IP=${clientIP}`);
 
-            const siteKey = process.env.TURNSTILE_SITE_KEY || "";
-            const secretKey = process.env.TURNSTILE_SECRET_KEY || "";
-            if (siteKey && secretKey) {
-                // Verify Turnstile token
-                const isCaptchaValid = await verifyTurnstileToken(data.captchaToken, clientIP, secretKey);
-                if (!isCaptchaValid) {
+                const siteKey = process.env.TURNSTILE_SITE_KEY || "";
+                const secretKey = process.env.TURNSTILE_SECRET_KEY || "";
+                if (siteKey && secretKey) {
+                    // Verify Turnstile token
+                    const isCaptchaValid = await verifyTurnstileToken(data?.captchaToken, clientIP, secretKey);
+                    if (!isCaptchaValid) {
+                        return callback({
+                            ok: false,
+                            msg: "Invalid CAPTCHA"
+                        });
+                    }
+                } else {
+                    log.warn("auth", "Turnstile keys are not configured. Skipping CAPTCHA verification.");
+                }
+
+                // Checking
+                if (typeof callback !== "function") {
+                    return;
+                }
+
+                if (!data) {
+                    return;
+                }
+
+                // Login Rate Limit (global bucket) + 2FA bucket so token
+                // guessing cannot run unbounded.
+                if (!await loginRateLimiter.pass(callback)) {
+                    log.info("auth", `Too many failed requests for user ${data.username}. IP=${clientIP}`);
+                    return;
+                }
+                if (data.token && !await twoFaRateLimiter.pass(callback)) {
+                    log.info("auth", `Too many 2FA attempts for user ${data.username}. IP=${clientIP}`);
+                    return;
+                }
+
+                const user = await this.login(data.username, data.password);
+
+                if (!user) {
+                    log.warn("auth", `Incorrect username or password. IP=${clientIP}`);
+                    // Same message for unknown user vs bad password to
+                    // avoid trivial enumeration.
                     return callback({
                         ok: false,
-                        msg: "Invalid CAPTCHA"
+                        msg: "authIncorrectCreds",
+                        msgi18n: true,
                     });
                 }
-            } else {
-                log.warn("auth", "Turnstile keys are not configured. Skipping CAPTCHA verification.");
-            }
 
-            // Checking
-            if (typeof callback !== "function") {
-                return;
-            }
-
-            if (!data) {
-                return;
-            }
-
-            // Login Rate Limit
-            if (!await loginRateLimiter.pass(callback)) {
-                log.info("auth", `Too many failed requests for user ${data.username}. IP=${clientIP}`);
-                return;
-            }
-
-            const user = await this.login(data.username, data.password);
-
-            if (user) {
-                if (user.twofa_status === 0) {
+                if (user.twofa_status === 0 && !data.token) {
                     server.afterLogin(socket, user);
 
                     log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
 
-                    callback({
+                    return callback({
                         ok: true,
                         token: User.createJWT(user, server.jwtSecret),
                     });
                 }
 
                 if (user.twofa_status === 1 && !data.token) {
-
                     log.info("auth", `2FA token required for user ${data.username}. IP=${clientIP}`);
-
-                    callback({
+                    return callback({
                         tokenRequired: true,
                     });
                 }
 
-                if (data.token) {
-                    // @ts-ignore
-                    const verify = notp.totp.verify(data.token, user.twofa_secret, twoFAVerifyOptions);
-
-                    if (user.twofa_last_token !== data.token && verify) {
-                        server.afterLogin(socket, user);
-
-                        await R.exec("UPDATE `user` SET twofa_last_token = ? WHERE id = ? ", [
-                            data.token,
-                            socket.userID,
-                        ]);
-
-                        log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
-
-                        callback({
-                            ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
-                        });
-                    } else {
-
-                        log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
-
-                        callback({
-                            ok: false,
-                            msg: "authInvalidToken",
-                            msgi18n: true,
-                        });
-                    }
-                }
-            } else {
-
-                log.warn("auth", `Incorrect username or password for user ${data.username}. IP=${clientIP}`);
-
-                callback({
+                // next-dev: 2FA stack (notp/twoFAVerifyOptions) was never
+                // wired — previous code threw ReferenceError and hung logins
+                // for any 2FA-enabled account. Fail closed with a clear
+                // message instead of crashing the handler.
+                log.warn("auth", `2FA login attempted for user ${data.username} but 2FA backend is not configured. IP=${clientIP}`);
+                return callback({
                     ok: false,
-                    msg: "authIncorrectCreds",
-                    msgi18n: true,
+                    msg: "2FA is not available on this build. Disable 2FA in the database or contact the administrator.",
                 });
+            } catch (e) {
+                log.error("auth", "Login handler failed: " + (e instanceof Error ? e.message : e));
+                if (typeof callback === "function") {
+                    callback({
+                        ok: false,
+                        msg: "authIncorrectCreds",
+                        msgi18n: true,
+                    });
+                }
             }
-
         });
 
         // Change Password

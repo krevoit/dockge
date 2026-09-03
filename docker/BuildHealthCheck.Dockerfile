@@ -1,7 +1,8 @@
 ############################################
 # Build in Golang
 ############################################
-FROM golang:1.21.4-bookworm
+# next-dev: was golang:1.21.4-bookworm (EOL, unpatched CVEs).
+FROM golang:1.22-bookworm
 WORKDIR /app
 ARG TARGETPLATFORM
 COPY ./extra/healthcheck.go ./extra/healthcheck.go

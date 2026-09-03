@@ -46,6 +46,8 @@
                     </div>
                     <div class="resource-grid">
                         <div><strong>{{ $t("status") }}</strong><span>{{ container.status }}</span></div>
+                        <div><strong>CPU</strong><span>{{ statFor(container.name).CPUPerc || "—" }}</span></div>
+                        <div><strong>{{ $t("memory") }}</strong><span>{{ statFor(container.name).MemUsage || "—" }}{{ statFor(container.name).MemPerc ? ` (${statFor(container.name).MemPerc})` : "" }}</span></div>
                         <div><strong>{{ $tc("network", 2) }}</strong><span>{{ formatList(container.networks) }}</span></div>
                         <div><strong>{{ $tc("port", 2) }}</strong><span>{{ container.ports || $t("notAvailableShort") }}</span></div>
                         <div><strong>{{ $tc("volume", 2) }}</strong><span>{{ formatMounts(container.mounts) }}</span></div>
@@ -216,6 +218,7 @@ export default {
             networks: [],
             volumes: [],
             images: [],
+            dockerStatsMap: {},
             selectedNetworkContainers: {},
             creatingNetwork: false,
             newNetwork: {
@@ -247,6 +250,17 @@ export default {
                 this.volumes = res.resources.volumes;
                 this.images = res.resources.images || [];
             });
+            // next-dev: live CPU/MEM for containers tab (same source as homepage)
+            this.$root.emitAgent("", "dockerStats", (res) => {
+                if (res?.ok) {
+                    this.dockerStatsMap = res.dockerStats || {};
+                }
+            });
+        },
+        statFor(name) {
+            const norm = (s) => String(s || "").replace(/^\//, "");
+            const key = norm(name);
+            return this.dockerStatsMap[key] || {};
         },
         deleteResource(type, name) {
             if (!confirm(`${this.$t("deleteDockerResourceMsg")} ${name}?`)) {
