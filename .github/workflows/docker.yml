@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve Docker tag
         id: vars
@@ -82,10 +82,24 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }}
-          docker push ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
+          push_retry() {
+            local img="$1"
+            local attempt=1
+            while [ $attempt -le 4 ]; do
+              if docker push "$img"; then
+                return 0
+              fi
+              echo "Push of $img failed (attempt $attempt/4), retrying in 15s..."
+              sleep 15
+              attempt=$((attempt + 1))
+            done
+            echo "Push of $img failed after 4 attempts"
+            return 1
+          }
+          push_retry ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }}
+          push_retry ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }}
+          push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }}
+          push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
 
       - name: Trivy vulnerability scan (next-dev tag)
         uses: aquasecurity/trivy-action@v0.36.0
