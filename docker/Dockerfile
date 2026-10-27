@@ -10,7 +10,7 @@ FROM cmcooper1980/dockge:base AS build_frontend
 WORKDIR /app
 COPY --chown=node:node . .
 RUN --mount=type=cache,id=npm,target=/npm/store \
-    npm install && \
+    npm ci && \
     npm run build:frontend
 
 ############################################
@@ -44,7 +44,8 @@ VOLUME /app/data
 EXPOSE 5001
 HEALTHCHECK --interval=60s --timeout=30s --start-period=60s --retries=5 CMD extra/healthcheck
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["tsx", "./backend/index.ts"]
+# Use the tsx version locked in package-lock.json rather than a global install
+CMD ["/app/node_modules/.bin/tsx", "./backend/index.ts"]
 
 ############################################
 # Mark as Nightly

@@ -1,8 +1,8 @@
 ############################################
 # Build in Golang
 ############################################
-# next-dev: was golang:1.21.4-bookworm (EOL, unpatched CVEs).
-FROM golang:1.22-bookworm
+# Go 1.27 (supported release; 1.22 is EOL)
+FROM golang:1.27.3-trixie
 WORKDIR /app
 ARG TARGETPLATFORM
 COPY ./extra/healthcheck.go ./extra/healthcheck.go

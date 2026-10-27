@@ -94,7 +94,7 @@
 
                 <section class="agents-panel">
                     <div class="panel-heading agent-panel-heading">
-                        <h2>{{ $tc("dockgeAgent", 2) }}</h2>
+                        <h2>{{ $t("dockgeAgent", 2) }}</h2>
                         <button v-if="!showAgentForm" class="btn btn-link" @click="showAgentForm = true">
                             <font-awesome-icon icon="plus" /> {{ $t("addAgent") }}
                         </button>

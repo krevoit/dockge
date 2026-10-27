@@ -94,7 +94,11 @@ export class Stack {
     protected combinedTerminal? : Terminal;
 
     protected static managedStackList: Map<string, Stack> = new Map();
-    protected static updateInfoCache: Map<string, { checkedAt: number, hasUpdates: boolean, updateServices: string[] }> = new Map();
+    protected static updateInfoCache: Map<string, {
+        checkedAt: number,
+        hasUpdates: boolean,
+        updateServices: string[],
+    }> = new Map();
     protected static imageRepository: ImageRepository = new ImageRepository();
 
     constructor(server : DockgeServer, name : string, composeYAML? : string, composeENV? : string, composeOverrideYAML? : string, skipFSOperations = false) {
@@ -331,10 +335,7 @@ export class Stack {
 
         if (options.deleteStackFiles) {
             // Remove the stack folder
-            await fsAsync.rm(this.path, {
-                recursive: true,
-                force: true
-            });
+            await this.removeStackFolder();
         }
 
         return exitCode;
@@ -344,11 +345,7 @@ export class Stack {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "down", "-v", "--remove-orphans" ], this.path);
 
-        // Remove the stack folder
-        await fsAsync.rm(this.path, {
-            recursive: true,
-            force: true
-        });
+        await this.removeStackFolder();
 
         return exitCode;
     }
@@ -802,7 +799,25 @@ export class Stack {
         }
     }
 
+    /**
+     * Recursively delete the stack folder, but only if it is a direct child of the stacks directory
+     */
+    protected async removeStackFolder() {
+        const stackPath = assertSafePath(this.server.stacksDir, this.name);
+        if (path.dirname(stackPath) !== path.resolve(this.server.stacksDir)) {
+            throw new ValidationError("Refusing to delete a folder outside the stacks directory");
+        }
+        await fsAsync.rm(stackPath, {
+            recursive: true,
+            force: true
+        });
+    }
+
     async joinContainerTerminal(socket: DockgeSocket, serviceName: string, shell : string = "sh", index: number = 0) {
+        assertSafeServiceName(serviceName);
+        if (![ "sh", "bash" ].includes(shell)) {
+            throw new ValidationError("Only sh and bash are supported container shells.");
+        }
         const terminalName = getContainerExecTerminalName(socket.endpoint, this.name, serviceName, index);
         let terminal = Terminal.getTerminal(terminalName);
 
@@ -817,6 +832,7 @@ export class Stack {
     }
 
     async joinContainerLogsTerminal(socket: DockgeSocket, serviceName: string) {
+        assertSafeServiceName(serviceName);
         const terminalName = getContainerLogsTerminalName(socket.endpoint, this.name, serviceName);
         const terminal = Terminal.getOrCreateTerminal(this.server, terminalName, "docker", this.getComposeOptions("logs", "-f", "--tail", "100", serviceName), this.path);
         terminal.enableKeepAlive = true;
@@ -840,7 +856,12 @@ export class Stack {
 
             let lines = res.stdout?.toString().split("\n");
 
-            const addLine = (obj: { Service: string, State: string, Name: string, Health: string }) => {
+            const addLine = (obj: {
+                Service: string,
+                State: string,
+                Name: string,
+                Health: string,
+            }) => {
                 if (!statusList.has(obj.Service)) {
                     statusList.set(obj.Service, []);
                 }

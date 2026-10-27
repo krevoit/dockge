@@ -25,32 +25,34 @@ import childProcessAsync from "promisify-child-process";
 const FORK_IMAGE_REPOSITORY = "krevoit/dockge";
 const FORK_IMAGE_TAGS = [ "latest", "dev" ];
 
-async function verifyTurnstileToken(token: string, clientIP: string, secretKey: string): Promise<boolean> {
-    if (!token) {
-        console.error("Token is not provided.");
+async function verifyTurnstileToken(token: unknown, clientIP: string, secretKey: string): Promise<boolean> {
+    if (typeof token !== "string" || !token || token.length > 2048) {
+        log.warn("auth", "Turnstile token is missing or invalid");
         return false;
     }
 
-    const url = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-    const result = await fetch(url, {
-        body: JSON.stringify({
-            secret: secretKey,
-            response: token,
-            remoteip: clientIP
-        }),
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
+    try {
+        const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            body: JSON.stringify({
+                secret: secretKey,
+                response: token,
+                remoteip: clientIP
+            }),
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            signal: AbortSignal.timeout(10 * 1000),
+        });
+        const outcome = await result.json();
+        if (outcome && outcome.success) {
+            return true;
         }
-    });
-    const outcome = await result.json();
-    if (outcome && outcome.success) {
-        console.log("Token verified successfully:", outcome);
-        return true;
+        log.warn("auth", `Turnstile verification failed: ${outcome?.["error-codes"]}`);
+    } catch (e) {
+        log.error("auth", `Turnstile verification error: ${e}`);
     }
-    console.error("Token verification failed:", outcome["error-codes"]);
     return false;
-
 }
 
 export class MainSocketHandler extends SocketHandler {
@@ -190,27 +192,12 @@ export class MainSocketHandler extends SocketHandler {
 
                 log.info("auth", `Login by username + password. IP=${clientIP}`);
 
-                const siteKey = process.env.TURNSTILE_SITE_KEY || "";
-                const secretKey = process.env.TURNSTILE_SECRET_KEY || "";
-                if (siteKey && secretKey) {
-                    // Verify Turnstile token
-                    const isCaptchaValid = await verifyTurnstileToken(data?.captchaToken, clientIP, secretKey);
-                    if (!isCaptchaValid) {
-                        return callback({
-                            ok: false,
-                            msg: "Invalid CAPTCHA"
-                        });
-                    }
-                } else {
-                    log.warn("auth", "Turnstile keys are not configured. Skipping CAPTCHA verification.");
-                }
-
                 // Checking
                 if (typeof callback !== "function") {
                     return;
                 }
 
-                if (!data) {
+                if (!data || typeof data !== "object") {
                     return;
                 }
 
@@ -223,6 +210,19 @@ export class MainSocketHandler extends SocketHandler {
                 if (data.token && !await twoFaRateLimiter.pass(callback)) {
                     log.info("auth", `Too many 2FA attempts for user ${data.username}. IP=${clientIP}`);
                     return;
+                }
+
+                // CAPTCHA after rate limiting, so failed attempts can't trigger unlimited outbound requests
+                const siteKey = process.env.TURNSTILE_SITE_KEY || "";
+                const secretKey = process.env.TURNSTILE_SECRET_KEY || "";
+                if (siteKey && secretKey) {
+                    const isCaptchaValid = await verifyTurnstileToken(data.captchaToken, clientIP, secretKey);
+                    if (!isCaptchaValid) {
+                        return callback({
+                            ok: false,
+                            msg: "Invalid CAPTCHA"
+                        });
+                    }
                 }
 
                 const user = await this.login(data.username, data.password);

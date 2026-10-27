@@ -185,9 +185,11 @@ export class DockgeServer {
             res.setHeader("X-Frame-Options", "DENY");
             res.setHeader("Referrer-Policy", "no-referrer");
             res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+            // Turnstile (optional login CAPTCHA) loads a script and an iframe from Cloudflare
+            const turnstile = process.env.TURNSTILE_SITE_KEY ? " https://challenges.cloudflare.com" : "";
             res.setHeader(
                 "Content-Security-Policy",
-                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'"
+                `default-src 'self'; script-src 'self'${turnstile}; frame-src 'self'${turnstile}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'self'; base-uri 'self'; frame-ancestors 'none'`
             );
             if (this.config.sslKey && this.config.sslCert) {
                 res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -561,7 +563,7 @@ export class DockgeServer {
         try {
             dayjs.utc("2013-11-18 11:55").tz(timezone).format();
         } catch (e) {
-            throw new Error("Invalid timezone:" + timezone);
+            throw new Error("Invalid timezone:" + timezone, { cause: e });
         }
     }
 
@@ -659,7 +661,10 @@ export class DockgeServer {
         let stacksWithUpdates = 0;
         let servicesWithUpdates = 0;
         for (const stack of stackList.values()) {
-            const stackData = stack.toSimpleJSON("") as { hasUpdates?: boolean, updateServices?: string[] };
+            const stackData = stack.toSimpleJSON("") as {
+                hasUpdates?: boolean,
+                updateServices?: string[],
+            };
             if (stackData.hasUpdates) {
                 stacksWithUpdates++;
                 servicesWithUpdates += stackData.updateServices?.length ?? 0;

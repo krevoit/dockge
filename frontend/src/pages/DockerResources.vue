@@ -11,19 +11,19 @@
 
             <div class="btn-group mb-3" role="group">
                 <button class="btn" :class="activeTab === 'containers' ? 'btn-primary' : 'btn-normal'" @click="activeTab = 'containers'">
-                    {{ $tc("container", 2) }}
+                    {{ $t("container", 2) }}
                     <span class="badge bg-secondary ms-1">{{ containers.length }}</span>
                 </button>
                 <button class="btn" :class="activeTab === 'networks' ? 'btn-primary' : 'btn-normal'" @click="activeTab = 'networks'">
-                    {{ $tc("network", 2) }}
+                    {{ $t("network", 2) }}
                     <span class="badge bg-secondary ms-1">{{ networks.length }}</span>
                 </button>
                 <button class="btn" :class="activeTab === 'volumes' ? 'btn-primary' : 'btn-normal'" @click="activeTab = 'volumes'">
-                    {{ $tc("volume", 2) }}
+                    {{ $t("volume", 2) }}
                     <span class="badge bg-secondary ms-1">{{ volumes.length }}</span>
                 </button>
                 <button class="btn" :class="activeTab === 'images' ? 'btn-primary' : 'btn-normal'" @click="activeTab = 'images'">
-                    {{ $tc("image", 2) }}
+                    {{ $t("image", 2) }}
                     <span class="badge bg-secondary ms-1">{{ images.length }}</span>
                 </button>
             </div>
@@ -48,9 +48,9 @@
                         <div><strong>{{ $t("status") }}</strong><span>{{ container.status }}</span></div>
                         <div><strong>CPU</strong><span>{{ statFor(container.name).CPUPerc || "—" }}</span></div>
                         <div><strong>{{ $t("memory") }}</strong><span>{{ statFor(container.name).MemUsage || "—" }}{{ statFor(container.name).MemPerc ? ` (${statFor(container.name).MemPerc})` : "" }}</span></div>
-                        <div><strong>{{ $tc("network", 2) }}</strong><span>{{ formatList(container.networks) }}</span></div>
-                        <div><strong>{{ $tc("port", 2) }}</strong><span>{{ formatPorts(container.ports) }}</span></div>
-                        <div><strong>{{ $tc("volume", 2) }}</strong><span>{{ formatMounts(container.mounts) }}</span></div>
+                        <div><strong>{{ $t("network", 2) }}</strong><span>{{ formatList(container.networks) }}</span></div>
+                        <div><strong>{{ $t("port", 2) }}</strong><span>{{ formatPorts(container.ports) }}</span></div>
+                        <div><strong>{{ $t("volume", 2) }}</strong><span>{{ formatMounts(container.mounts) }}</span></div>
                     </div>
                 </div>
             </div>
@@ -123,7 +123,7 @@
                         <div><strong>{{ $t("scope") }}</strong><span>{{ network.scope }}</span></div>
                         <div><strong>IPAM</strong><span>{{ formatIPAM(network.ipam) }}</span></div>
                         <div><strong>{{ $t("options") }}</strong><span>{{ formatObject(network.options) }}</span></div>
-                        <div><strong>{{ $tc("container", 2) }}</strong><span>{{ network.containers.length }}</span></div>
+                        <div><strong>{{ $t("container", 2) }}</strong><span>{{ network.containers.length }}</span></div>
                     </div>
                     <div v-if="canManageNetwork(network.name)" class="network-members mt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">

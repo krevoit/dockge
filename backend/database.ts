@@ -8,7 +8,7 @@ import knex from "knex";
 // @ts-ignore
 import Dialect from "knex/lib/dialects/sqlite3/index.js";
 
-import sqlite from "@louislam/sqlite3";
+import sqlite from "sqlite3";
 import { sleep } from "../common/util-common";
 
 interface DBConfig {
@@ -103,7 +103,7 @@ export class Database {
             this.writeDBConfig(dbConfig);
         }
 
-        let config = {};
+        let config;
 
         log.info("db", `Database Type: ${dbConfig.type}`);
 
@@ -113,9 +113,9 @@ export class Database {
 
             config = {
                 client: Dialect,
+                acquireConnectionTimeout: acquireConnectionTimeout,
                 connection: {
                     filename: Database.sqlitePath,
-                    acquireConnectionTimeout: acquireConnectionTimeout,
                 },
                 useNullAsDefault: true,
                 pool: {

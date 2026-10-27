@@ -105,7 +105,7 @@ export class TerminalSocketHandler extends AgentSocketHandler {
 
                 // Get stack
                 const stack = await Stack.getStack(server, stackName);
-                stack.joinContainerTerminal(socket, serviceName, shell);
+                await stack.joinContainerTerminal(socket, serviceName, shell);
 
                 callbackResult({
                     ok: true,
@@ -132,7 +132,7 @@ export class TerminalSocketHandler extends AgentSocketHandler {
                 log.debug("containerLogsTerminal", "Service name: " + serviceName);
 
                 const stack = await Stack.getStack(server, stackName);
-                stack.joinContainerLogsTerminal(socket, serviceName);
+                await stack.joinContainerLogsTerminal(socket, serviceName);
 
                 callbackResult({
                     ok: true,
@@ -201,10 +201,10 @@ export class TerminalSocketHandler extends AgentSocketHandler {
                     throw new Error("Terminal name must be a string.");
                 }
 
-                if (typeof rows !== "number") {
+                if (typeof rows !== "number" || !Number.isInteger(rows) || rows < 1 || rows > 1000) {
                     throw new Error("Command must be a number.");
                 }
-                if (typeof cols !== "number") {
+                if (typeof cols !== "number" || !Number.isInteger(cols) || cols < 1 || cols > 1000) {
                     throw new Error("Command must be a number.");
                 }
 

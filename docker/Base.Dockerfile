@@ -1,7 +1,8 @@
-# next-dev: pinned minor (was floating `node:22-bookworm-slim`).
+# Node.js 24 LTS on Debian 13 (trixie). Debian 12 left standard security support in July 2026
+# and Node.js 22 is maintenance-only (EOL April 2027).
 # Pin digest in release CI for full supply-chain pinning:
-#   docker buildx imagetools inspect node:22.14.0-bookworm-slim --format '{{.Manifest.Digest}}'
-FROM node:22.14.0-bookworm-slim
+#   docker buildx imagetools inspect node:24.22.1-trixie-slim --format '{{.Manifest.Digest}}'
+FROM node:24.22.1-trixie-slim
 RUN apt update && apt install --yes --no-install-recommends \
     curl \
     ca-certificates \
@@ -20,5 +21,4 @@ RUN apt update && apt install --yes --no-install-recommends \
     && apt --yes --no-install-recommends install \
          docker-ce-cli \
          docker-compose-plugin \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install -g tsx
+    && rm -rf /var/lib/apt/lists/*

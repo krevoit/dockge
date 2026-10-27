@@ -28,7 +28,7 @@ export class ImageRepository {
     async updateLocal(stack: string, service: string, image: string): Promise<ImageInfo> {
         let imageInfo = this.getImageInfo(stack, service, image);
 
-        const resLocal = await childProcessAsync.spawn("docker", [ "inspect", "--format", "json", image ], {
+        const resLocal = await childProcessAsync.spawn("docker", [ "inspect", "--format", "json", "--", image ], {
             encoding: "utf-8",
             timeout: 30 * 1000,
         });

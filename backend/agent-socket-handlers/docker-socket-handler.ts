@@ -412,15 +412,20 @@ export class DockerSocketHandler extends AgentSocketHandler {
 
                 this.assertSafeDockerName(name, "Resource name");
 
+                // "--" ends option parsing so a name can never be read as a flag
                 const commands : Record<string, string[]> = {
-                    container: [ "rm", "-f", name ],
-                    network: [ "network", "rm", name ],
-                    volume: [ "volume", "rm", name ],
-                    image: [ "image", "rm", name ],
+                    container: [ "rm", "-f", "--", name ],
+                    network: [ "network", "rm", "--", name ],
+                    volume: [ "volume", "rm", "--", name ],
+                    image: [ "image", "rm", "--", name ],
                 };
                 const args = commands[resourceType];
                 if (!args) {
                     throw new ValidationError("Unsupported Docker resource type");
+                }
+
+                if (resourceType === "container") {
+                    await this.checkNotDockgeContainer(name);
                 }
 
                 await childProcessAsync.spawn("docker", args, {
@@ -481,7 +486,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                         args.push("--opt", `${key}=${value}`);
                     }
                 }
-                args.push(name);
+                args.push("--", name);
 
                 await childProcessAsync.spawn("docker", args, {
                     encoding: "utf-8",
@@ -508,7 +513,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 this.assertSafeDockerName(containerName, "Container name");
 
                 await this.checkNotDockgeContainer(containerName);
-                await childProcessAsync.spawn("docker", [ "network", "connect", networkName, containerName ], {
+                await childProcessAsync.spawn("docker", [ "network", "connect", "--", networkName, containerName ], {
                     encoding: "utf-8",
                 });
 
@@ -533,7 +538,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 this.assertSafeDockerName(containerName, "Container name");
 
                 await this.checkNotDockgeContainer(containerName);
-                await childProcessAsync.spawn("docker", [ "network", "disconnect", networkName, containerName ], {
+                await childProcessAsync.spawn("docker", [ "network", "disconnect", "--", networkName, containerName ], {
                     encoding: "utf-8",
                 });
 
@@ -577,7 +582,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
     }
 
     async checkNotDockgeContainer(containerName : string) {
-        const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", containerName ], {
+        const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", "--type", "container", "--", containerName ], {
             encoding: "utf-8",
         });
         const inspect = JSON.parse(inspectRes.stdout?.toString() || "[]")[0] || {};
@@ -611,7 +616,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
             const containerName = String(container.Names || container.ID || "");
             let inspect : DockerInspectObject = {};
             try {
-                const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", containerName ], {
+                const inspectRes = await childProcessAsync.spawn("docker", [ "inspect", "--type", "container", "--", containerName ], {
                     encoding: "utf-8",
                 });
                 inspect = JSON.parse(inspectRes.stdout?.toString() || "[]")[0] || {};

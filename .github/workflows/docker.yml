@@ -10,9 +10,8 @@ on:
         options:
           - latest
           - dev
-          - next-dev
   push:
-    branches: [ "master", "next-dev" ]
+    branches: [ "next-dev" ]
 
 permissions:
   contents: read
@@ -29,31 +28,31 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Resolve Docker tag
         id: vars
         run: |
+          # next-dev is the main branch: pushes publish `latest`. The `next-dev` tag is kept
+          # as an alias so existing installs pinned to it keep receiving updates.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "next-dev" ]; then
-            echo "tag=next-dev" >> "$GITHUB_OUTPUT"
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -72,13 +71,18 @@ jobs:
 
       - name: Build Docker image
         run: |
+          alias_tags=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            alias_tags="--tag ghcr.io/${{ github.repository_owner }}/dockge:next-dev --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:next-dev"
+          fi
           docker build . \
             --file docker/Dockerfile \
             --target release \
             --tag ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }} \
             --tag ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }} \
             --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }} \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
+            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }} \
+            $alias_tags
 
       - name: Push Docker image
         run: |
@@ -100,8 +104,12 @@ jobs:
           push_retry ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }}
           push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }}
           push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
+          if [ "${{ github.event_name }}" = "push" ]; then
+            push_retry ghcr.io/${{ github.repository_owner }}/dockge:next-dev
+            push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:next-dev
+          fi
 
-      - name: Trivy vulnerability scan (next-dev tag)
+      - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }}
@@ -115,4 +123,4 @@ jobs:
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
-          category: trivy-next-dev
+          category: trivy

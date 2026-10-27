@@ -129,7 +129,7 @@
                     <!-- Containers -->
                     <div class="section-heading">
                         <div>
-                            <h2>{{ $tc("container", 2) }}</h2>
+                            <h2>{{ $t("container", 2) }}</h2>
                             <span>{{ Object.keys(jsonConfig.services || {}).length }} · Compose services</span>
                         </div>
                         <button v-if="isEditMode" class="btn btn-primary add-container-button" type="button" @click="openContainerBuilder">
@@ -167,11 +167,11 @@
                         </div>
                         <div class="shadow-box big-padding mb-3">
                             <div class="mb-4">
-                                <label class="form-label">{{ $tc("url", 2) }}</label>
+                                <label class="form-label">{{ $t("url", 2) }}</label>
                                 <ArrayInput name="urls" :display-name="$t('url')" placeholder="https://" object-type="x-dockge" />
                             </div>
                             <div>
-                                <label class="form-label">{{ $tc("network", 2) }}</label>
+                                <label class="form-label">{{ $t("network", 2) }}</label>
                                 <NetworkInput />
                             </div>
                         </div>
