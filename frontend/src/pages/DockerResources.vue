@@ -40,7 +40,7 @@
                             </div>
                             <div class="resource-subtitle">{{ container.image }}</div>
                         </div>
-                        <button class="btn btn-sm btn-danger" @click="deleteResource('container', container.name)">
+                        <button class="btn btn-sm btn-outline-danger delete-btn" :title="$t('delete')" :aria-label="$t('delete')" @click="deleteResource('container', container.name)">
                             <font-awesome-icon icon="trash" />
                         </button>
                     </div>
@@ -49,7 +49,7 @@
                         <div><strong>CPU</strong><span>{{ statFor(container.name).CPUPerc || "—" }}</span></div>
                         <div><strong>{{ $t("memory") }}</strong><span>{{ statFor(container.name).MemUsage || "—" }}{{ statFor(container.name).MemPerc ? ` (${statFor(container.name).MemPerc})` : "" }}</span></div>
                         <div><strong>{{ $tc("network", 2) }}</strong><span>{{ formatList(container.networks) }}</span></div>
-                        <div><strong>{{ $tc("port", 2) }}</strong><span>{{ container.ports || $t("notAvailableShort") }}</span></div>
+                        <div><strong>{{ $tc("port", 2) }}</strong><span>{{ formatPorts(container.ports) }}</span></div>
                         <div><strong>{{ $tc("volume", 2) }}</strong><span>{{ formatMounts(container.mounts) }}</span></div>
                     </div>
                 </div>
@@ -114,7 +114,7 @@
                             </div>
                             <div class="resource-subtitle">{{ network.driver }} / {{ network.scope }}</div>
                         </div>
-                        <button v-if="!isBuiltInNetwork(network.name)" class="btn btn-sm btn-danger" @click="deleteResource('network', network.name)">
+                        <button v-if="!isBuiltInNetwork(network.name)" class="btn btn-sm btn-outline-danger delete-btn" :title="$t('delete')" :aria-label="$t('delete')" @click="deleteResource('network', network.name)">
                             <font-awesome-icon icon="trash" />
                         </button>
                     </div>
@@ -161,12 +161,12 @@
                     <div class="resource-main">
                         <div>
                             <div class="resource-title">
-                                {{ volume.name }}
+                                <span :title="volume.name">{{ shortName(volume.name) }}</span>
                                 <span v-if="volume.unused" class="badge bg-secondary ms-2">{{ $t("unused") }}</span>
                             </div>
                             <div class="resource-subtitle">{{ volume.driver }} / {{ volume.scope }}</div>
                         </div>
-                        <button class="btn btn-sm btn-danger" @click="deleteResource('volume', volume.name)">
+                        <button class="btn btn-sm btn-outline-danger delete-btn" :title="$t('delete')" :aria-label="$t('delete')" @click="deleteResource('volume', volume.name)">
                             <font-awesome-icon icon="trash" />
                         </button>
                     </div>
@@ -189,9 +189,9 @@
                                 <span v-if="image.unused" class="badge bg-secondary ms-2">{{ $t("unused") }}</span>
                                 <span v-if="image.dangling" class="badge bg-warning text-dark ms-1">{{ $t("dangling") }}</span>
                             </div>
-                            <div class="resource-subtitle">{{ image.id }}</div>
+                            <div class="resource-subtitle mono">{{ String(image.id || "").replace(/^sha256:/, "").slice(0, 12) }}</div>
                         </div>
-                        <button class="btn btn-sm btn-danger" @click="deleteResource('image', image.name)">
+                        <button class="btn btn-sm btn-outline-danger delete-btn" :title="$t('delete')" :aria-label="$t('delete')" @click="deleteResource('image', image.name)">
                             <font-awesome-icon icon="trash" />
                         </button>
                     </div>
@@ -324,7 +324,18 @@ export default {
             if (!mounts || mounts.length === 0) {
                 return this.$t("notAvailableShort");
             }
-            return mounts.map(mount => `${mount.name} -> ${mount.destination}`).join(", ");
+            return mounts.map(mount => `${this.shortName(mount.name)} → ${mount.destination}`).join(", ");
+        },
+        formatPorts(ports) {
+            // "0.0.0.0:8080->80/tcp, :::8080->80/tcp" -> "8080 → 80/tcp"
+            const list = String(ports || "").split(",")
+                .map(port => port.trim().replace(/^(0\.0\.0\.0|\[?::\]?):/, "").replace("->", " → "))
+                .filter(Boolean);
+            return list.length ? [ ...new Set(list) ].join(", ") : this.$t("notAvailableShort");
+        },
+        shortName(name) {
+            // Anonymous volumes are named by a 64-character hash
+            return /^[a-f0-9]{64}$/.test(name || "") ? name.slice(0, 12) : name;
         },
         formatIPAM(ipam) {
             if (!ipam || ipam.length === 0) {
@@ -500,4 +511,11 @@ export default {
         grid-template-columns: 1fr;
     }
 }
+
+.delete-btn {
+    flex: 0 0 auto;
+}
+
+.resource-title { word-break: normal; overflow-wrap: anywhere; }
+.mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
 </style>

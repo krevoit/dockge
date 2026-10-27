@@ -175,19 +175,27 @@ export default {
                 return;
             }
 
-            this.jsonConfig.networks = {};
+            const networks = {};
 
-            // Internal networks
+            // Internal networks (skip rows that don't have a name yet)
             for (const networkRow of this.networkList) {
-                this.jsonConfig.networks[networkRow.key] = networkRow.value;
+                const networkName = networkRow.key.trim();
+                if (networkName) {
+                    networks[networkName] = networkRow.value;
+                }
             }
 
             // External networks
             for (const networkName in this.externalList) {
-                this.jsonConfig.networks[networkName] = this.externalList[networkName];
+                networks[networkName] = this.externalList[networkName];
             }
 
-            console.debug("applyToYAML", this.jsonConfig.networks);
+            // Don't add an empty "networks: {}" to the compose file just by opening the editor
+            if (Object.keys(networks).length > 0) {
+                this.jsonConfig.networks = networks;
+            } else if (this.jsonConfig.networks) {
+                delete this.jsonConfig.networks;
+            }
         }
 
     },
@@ -198,8 +206,6 @@ export default {
 @import "../styles/vars.scss";
 
 .list-group {
-    background-color: $dark-bg2;
-
     li {
         display: flex;
         align-items: center;
@@ -207,16 +213,31 @@ export default {
 
         .domain-input {
             flex-grow: 1;
-            background-color: $dark-bg2;
+            background-color: transparent;
             border: none;
-            color: $dark-font-color;
+            color: inherit;
             outline: none;
 
             &::placeholder {
-                color: #1d2634;
+                color: #8b9098;
             }
         }
     }
+}
+
+.form-check-label { font-size: 13px; }
+
+h5 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: inherit;
+}
+
+.dark .list-group {
+    background-color: $dark-bg2;
+
+    li .domain-input::placeholder { color: #626871; }
 }
 
 .delete {

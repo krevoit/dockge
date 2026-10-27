@@ -560,7 +560,7 @@ export default {
 }
 
 .list-header {
-    border-bottom: 1px solid #2b2f36;
+    border-bottom: 1px solid #e1e4e8;
     margin-bottom: 0;
     padding-bottom: 12px;
 
@@ -607,7 +607,7 @@ export default {
     padding: 9px 10px;
     position: absolute;
     z-index: 1;
-    color: #c0c0c0;
+    color: #8b9098;
 
     // Clear filter button (X)
     svg[data-icon="times"] {
@@ -632,9 +632,9 @@ export default {
 
 .filter-icon-container {
     align-items: center;
-    border: 1px solid #343941;
+    border: 1px solid #d9dce1;
     border-radius: 6px;
-    color: #aab1bb;
+    color: #5f656d;
     display: flex;
     gap: 7px;
     min-height: 34px;
@@ -646,10 +646,10 @@ export default {
 
 .updates-only-toggle {
     align-items: center;
-    background: #191c21;
-    border: 1px solid #343941;
+    background: #f6f7f9;
+    border: 1px solid #d9dce1;
     border-radius: 6px;
-    color: #adb4be;
+    color: #5f656d;
     display: flex;
     font-size: 12px;
     gap: 7px;
@@ -658,9 +658,9 @@ export default {
 
     span {
         align-items: center;
-        background: #292e36;
+        background: #eceef1;
         border-radius: 4px;
-        color: #d8aa51;
+        color: #9a6a10;
         display: inline-flex;
         font-size: 10px;
         height: 18px;
@@ -672,12 +672,12 @@ export default {
     &.active {
         background: rgba($primary, 0.1);
         border-color: rgba($primary, 0.65);
-        color: #8bb3eb;
+        color: #2f6fc4;
     }
 }
 
 .filter-icon {
-    color: $dark-font-color3;
+    color: #8b9098;
     cursor: pointer;
 }
 
@@ -686,11 +686,11 @@ export default {
 }
 
 .filter-dropdown {
-    background: #191c21;
-    border: 1px solid $dark-border-color;
+    background: #ffffff;
+    border: 1px solid #d9dce1;
     border-radius: 7px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
-    color: $dark-font-color;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    color: #262a2f;
     min-width: 230px;
     padding: 8px 0;
     position: absolute;
@@ -704,25 +704,25 @@ export default {
 .filter-dropdown-clear {
     background: transparent;
     border: 0;
-    color: $dark-font-color;
+    color: #262a2f;
     padding: 6px 14px;
     text-align: left;
     width: 100%;
 
     &:disabled {
-        color: $dark-font-color3;
+        color: #a1a9b4;
         cursor: not-allowed;
     }
 }
 
 .filter-section {
-    border-top: 1px solid $dark-border-color;
+    border-top: 1px solid #e1e4e8;
     margin-top: 6px;
     padding: 8px 14px 2px;
 }
 
 .filter-heading {
-    color: $dark-font-color;
+    color: #262a2f;
     font-size: 12px;
     font-weight: 600;
     margin-bottom: 6px;
@@ -763,10 +763,10 @@ export default {
 }
 
 .agent-select {
-    border-bottom: 1px solid #292e35;
-    border-top: 1px solid #292e35;
+    border-bottom: 1px solid #e1e4e8;
+    border-top: 1px solid #e1e4e8;
     cursor: pointer;
-    color: #aeb5bf;
+    color: #5f656d;
     font-size: 12px;
     font-weight: 500;
     min-height: 37px;
@@ -796,7 +796,7 @@ export default {
 }
 
 .stack-table-head {
-    color: #89919c;
+    color: #737982;
     display: grid;
     font-size: 11px;
     font-weight: 500;
@@ -808,7 +808,42 @@ export default {
 .updates-column { text-align: center; }
 
 .search-input {
-    background: #101216;
-    border-color: #30353d;
+    background: #f6f7f9;
+    border-color: #d9dce1;
+}
+
+.dark {
+    .list-header { border-bottom-color: $dark-border-color; }
+    .search-icon { color: #c0c0c0; }
+    .filter-icon-container { color: #aab1bb; }
+    .filter-icon { color: $dark-font-color3; }
+
+    .updates-only-toggle {
+        background: #191c21;
+        border-color: #343941;
+        color: #adb4be;
+
+        span { background: #292e36; color: #d8aa51; }
+        &.active { background: rgba($primary, 0.1); border-color: rgba($primary, 0.65); color: #8bb3eb; }
+    }
+
+    .filter-dropdown {
+        background: #191c21;
+        border-color: $dark-border-color;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        color: $dark-font-color;
+    }
+
+    .filter-dropdown-clear {
+        color: $dark-font-color;
+
+        &:disabled { color: $dark-font-color3; }
+    }
+
+    .filter-section { border-top-color: $dark-border-color; }
+    .filter-heading { color: $dark-font-color; }
+    .agent-select { border-color: #292e35; color: #aeb5bf; }
+    .stack-table-head { color: #89919c; }
+    .search-input { background: #101216; border-color: #30353d; }
 }
 </style>

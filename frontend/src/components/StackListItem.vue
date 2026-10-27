@@ -171,7 +171,7 @@ export default {
     gap: 8px;
     align-items: center;
     min-height: 42px;
-    border-bottom: 1px solid #292e35;
+    border-bottom: 1px solid #e8eaed;
     border-left: 2px solid transparent;
     border-radius: 0;
     transition: all ease-in-out 0.15s;
@@ -195,7 +195,7 @@ export default {
     }
 
     .title {
-        color: #e1e4e8;
+        color: #1d232b;
         font-size: 13px;
         font-weight: 500;
         line-height: 1.25;
@@ -203,13 +203,13 @@ export default {
         .dark & { color: #e1e4e8; }
     }
     .update-indicator {
-        color: #d8aa51;
+        color: #b07c12;
         font-size: 12px;
     }
     .endpoint {
         font-family: "JetBrains Mono", monospace;
         font-size: 11px;
-        color: $dark-font-color3;
+        color: #737982;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -217,13 +217,13 @@ export default {
 }
 
 .status-text {
-    color: #a1a9b4;
+    color: #5f656d;
     font-size: 12px;
     text-transform: capitalize;
 }
 
 .update-cell {
-    color: $dark-font-color3;
+    color: #8b9098;
     font-size: 11px;
     text-align: center;
 }
@@ -250,4 +250,11 @@ export default {
     opacity: 0.5;
 }
 
+.dark {
+    .item { border-bottom-color: #292e35; }
+    .item .update-indicator { color: #d8aa51; }
+    .item .endpoint { color: $dark-font-color3; }
+    .status-text { color: #a1a9b4; }
+    .update-cell { color: $dark-font-color3; }
+}
 </style>

@@ -749,3 +749,16 @@ code {
 
 // Localization
 @import "localization.scss";
+
+// Light theme: the default link colour is tuned for dark backgrounds and is too faint on white
+.light {
+    --bs-link-color: #2f6fc4;
+    --bs-link-color-rgb: 47, 111, 196;
+    --bs-link-hover-color: #24589e;
+    --bs-link-hover-color-rgb: 36, 88, 158;
+}
+
+// CodeMirror's content is contenteditable; don't paint it with the generic grey above
+.cm-editor [contenteditable="true"] {
+    background-color: transparent !important;
+}

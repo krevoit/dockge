@@ -61,6 +61,13 @@
                     </router-link>
                 </li>
 
+                <!-- Phones hide the profile menu, so Settings (which holds Logout) gets its own tab -->
+                <li v-if="$root.loggedIn && $root.isMobile" class="nav-item">
+                    <router-link to="/settings/general" class="nav-link" :aria-label="$t('Settings')">
+                        <font-awesome-icon icon="cog" /> {{ $t("Settings") }}
+                    </router-link>
+                </li>
+
                 <li v-if="$root.loggedIn" class="nav-item">
                     <div class="dropdown dropdown-profile-pic">
                         <div class="nav-link" data-bs-toggle="dropdown">
@@ -217,8 +224,8 @@ export default {
 
 .app-rail {
     align-items: center;
-    background: #111317;
-    border-bottom: 1px solid #2b2f36;
+    background: #ffffff;
+    border-bottom: 1px solid #d9dce1;
     display: flex;
     flex-direction: row;
     gap: 14px;
@@ -233,7 +240,7 @@ export default {
 
 .app-brand {
     align-items: center;
-    color: #f0f2f5;
+    color: #1d232b;
     display: flex;
     flex-direction: row;
     margin: 0;
@@ -249,7 +256,7 @@ export default {
 }
 
 .title {
-    color: #f0f2f5;
+    color: #1d232b;
     font-size: 19px !important;
     font-weight: 600;
     letter-spacing: -0.018em;
@@ -329,8 +336,8 @@ export default {
 
 .header-agent-select {
     align-items: center;
-    background: #17191d;
-    border: 1px solid #30343c;
+    background: #f6f7f9;
+    border: 1px solid #d9dce1;
     border-radius: 6px;
     display: flex;
     height: 36px;
@@ -340,7 +347,7 @@ export default {
         appearance: auto;
         background: transparent;
         border: 0;
-        color: #d9dde3;
+        color: #262a2f;
         font-size: 13px;
         min-width: 112px;
         outline: 0;
@@ -357,8 +364,8 @@ export default {
 
 .global-search {
     align-items: center;
-    background: #0d0f12;
-    border: 1px solid #2b2f36;
+    background: #f6f7f9;
+    border: 1px solid #d9dce1;
     border-radius: 6px;
     color: #7f8792;
     display: flex;
@@ -371,7 +378,7 @@ export default {
     input {
         background: transparent;
         border: 0;
-        color: #e1e4e8;
+        color: #262a2f;
         flex: 1;
         font-size: 13px;
         outline: 0;
@@ -379,8 +386,8 @@ export default {
     }
 
     kbd {
-        background: #22262c;
-        color: #929aa5;
+        background: #eceef1;
+        color: #6f757d;
         font-size: 10px;
     }
 }
@@ -487,7 +494,26 @@ export default {
         border-bottom-color: $dark-border-color;
     }
 
-    .app-brand .title { color: #f0f2f5; }
+    .app-brand, .app-brand .title { color: #f0f2f5; }
+
+    .header-agent-select {
+        background: #17191d;
+        border-color: #30343c;
+
+        select { color: #d9dde3; }
+
+        // Native option lists inherit the select's colour; keep them readable
+        option { background: #17191d; color: #d9dde3; }
+    }
+
+    .global-search {
+        background: #0d0f12;
+        border-color: #2b2f36;
+        color: #7f8792;
+
+        input { color: #e1e4e8; }
+        kbd { background: #22262c; color: #929aa5; }
+    }
     .fork-label { color: $dark-font-color3 !important; }
 
     .rail-nav .nav-link {

@@ -42,7 +42,7 @@ export default {
 }
 
 .dashboard-shell {
-    background: #0c0d0f;
+    background: #f3f4f6;
     min-height: calc(100vh - 62px);
     padding: 10px;
 
@@ -54,8 +54,8 @@ export default {
 }
 
 .stack-browser {
-    background: #15171b;
-    border: 1px solid #2b2f36;
+    background: #ffffff;
+    border: 1px solid #d9dce1;
     border-radius: 8px;
     height: calc(100vh - 82px);
     overflow: hidden;
@@ -83,6 +83,8 @@ export default {
 }
 
 .dark {
+    .dashboard-shell { background: #0c0d0f; }
+
     .stack-browser {
         background: #15171b;
         border-color: #2b2f36;

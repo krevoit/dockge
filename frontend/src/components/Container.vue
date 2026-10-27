@@ -13,7 +13,7 @@
                     <span class="me-1">{{ imageName }}:</span><span class="tag">{{ imageTag }}</span>
                 </div>
                 <div>
-                    <span class="badge me-1" :class="bgStyle">{{ status }}</span>
+                    <span class="badge me-1" :class="bgStyle">{{ status === "N/A" ? $t("notDeployed") : status }}</span>
 
                     <a v-for="port in envsubstService.ports" :key="port" :href="parsePort(port).url" target="_blank">
                         <span class="badge me-1 bg-secondary">{{ parsePort(port).display }}</span>
@@ -27,10 +27,6 @@
                         <font-awesome-icon icon="terminal" />
                         <span>{{ $t("console") }}</span>
                     </router-link>
-                    <button v-else-if="creationMode" class="btn btn-normal action-btn terminal-preview" type="button" disabled title="Deploy the stack to open the web terminal">
-                        <font-awesome-icon icon="terminal" />
-                        <span>Web terminal</span>
-                    </button>
                     <router-link v-if="runtimeActions" class="btn btn-normal action-btn" :to="logsRouteLink">
                         <font-awesome-icon icon="stream" />
                         {{ $t("logs") }}
@@ -67,11 +63,11 @@
         </div>
 
         <div v-if="isEditMode" class="mt-2">
-            <button class="btn btn-normal me-2" @click="showConfig = !showConfig">
-                <font-awesome-icon icon="edit" />
+            <button class="btn btn-normal btn-sm action-btn me-2" :aria-expanded="showConfig" @click="showConfig = !showConfig">
+                <font-awesome-icon :icon="showConfig ? 'chevron-up' : 'edit'" />
                 {{ $t("Edit") }}
             </button>
-            <button class="btn btn-danger me-2" @click="remove">
+            <button class="btn btn-outline-danger btn-sm action-btn me-2" @click="remove">
                 <font-awesome-icon icon="trash" />
                 {{ $t("deleteContainer") }}
             </button>
@@ -385,8 +381,8 @@ export default defineComponent({
 @import "../styles/vars";
 
 .container {
-    background: #111318 !important;
-    border-color: #292e35 !important;
+    background: var(--ct-111318) !important;
+    border-color: var(--ct-292e35) !important;
     border-radius: 6px !important;
     margin-bottom: 8px !important;
     max-width: none;
@@ -410,7 +406,7 @@ export default defineComponent({
         gap: 8px;
 
         h4 {
-            color: #e5e8ec;
+            color: var(--ct-e5e8ec);
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 0;
@@ -420,14 +416,14 @@ export default defineComponent({
     }
 
     .image {
-        color: #89919c;
+        color: var(--ct-89919c);
         font-family: "JetBrains Mono", monospace;
         font-size: 11px;
         margin: 3px 0 5px !important;
         overflow-wrap: anywhere;
 
         .tag {
-            color: #aeb5bf;
+            color: var(--ct-aeb5bf);
         }
     }
 
@@ -469,7 +465,7 @@ export default defineComponent({
 
     .update-indicator {
         align-items: center;
-        color: #d8aa51;
+        color: var(--ct-d8aa51);
         display: inline-flex;
         font-size: 0.78rem;
         font-weight: 600;
@@ -483,7 +479,7 @@ export default defineComponent({
     }
 
     .stats {
-        color: #a8b3c1;
+        color: var(--ct-a8b3c1);
         font-size: 12px;
     }
 
@@ -497,5 +493,28 @@ export default defineComponent({
 
     .container .function,
     .container .action-group { justify-content: start; }
+}
+</style>
+
+<style lang="scss">
+// Container card colours: dark values are the original design, light values for the light theme
+:root, .light {
+    --ct-111318: #ffffff;
+    --ct-292e35: #e1e4e8;
+    --ct-89919c: #5f656d;
+    --ct-a8b3c1: #5f656d;
+    --ct-aeb5bf: #5f656d;
+    --ct-d8aa51: #9a6a10;
+    --ct-e5e8ec: #1d232b;
+}
+
+.dark {
+    --ct-111318: #111318;
+    --ct-292e35: #292e35;
+    --ct-89919c: #89919c;
+    --ct-a8b3c1: #a8b3c1;
+    --ct-aeb5bf: #aeb5bf;
+    --ct-d8aa51: #d8aa51;
+    --ct-e5e8ec: #e5e8ec;
 }
 </style>

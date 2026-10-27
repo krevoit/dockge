@@ -245,7 +245,7 @@ export default {
             return (this.resourceContainers || []).map((c) => {
                 const name = norm(c.name || c.ID || "");
                 const stat = byName[name]
-                    || Object.entries(byName).find(([k]) => k === name || name.endsWith(k) || k.endsWith(name))?.[1]
+                    || Object.entries(byName).find(([ k ]) => k === name || name.endsWith(k) || k.endsWith(name))?.[1]
                     || {};
                 const cpu = this.parsePerc(stat.CPUPerc);
                 const memParts = String(stat.MemUsage || "").split("/");
@@ -492,7 +492,15 @@ export default {
             }
             const n = parseFloat(m[1]);
             const unit = (m[2] || "B").toUpperCase();
-            const mult = { B: 1, KB: 1000, MB: 1000 ** 2, GB: 1000 ** 3, TB: 1000 ** 4, KIB: 1024, MIB: 1024 ** 2, GIB: 1024 ** 3, TIB: 1024 ** 4 }[unit] || 1;
+            const mult = { B: 1,
+                KB: 1000,
+                MB: 1000 ** 2,
+                GB: 1000 ** 3,
+                TB: 1000 ** 4,
+                KIB: 1024,
+                MIB: 1024 ** 2,
+                GIB: 1024 ** 3,
+                TIB: 1024 ** 4 }[unit] || 1;
             return n * mult;
         },
 
@@ -782,7 +790,10 @@ export default {
 .resources-actions {
     align-items: center;
     display: flex;
+    flex: 0 0 auto;
     gap: 8px;
+
+    a, .btn { white-space: nowrap; }
 }
 
 .stats-loading {
@@ -918,6 +929,9 @@ export default {
     .resources-table th, .resources-table td { border-color: $dark-border-color; }
     .resources-table .cell-main span, .meter-label { color: $dark-font-color3; }
     .meter { background: #22262c; }
+    .mini-status { background: rgba(123, 129, 137, 0.18); color: #aab1bb; }
+    .mini-status.on { background: rgba(105, 200, 75, 0.16); color: #8fdc76; }
+    .mini-status.off { background: rgba($danger, 0.16); color: #ff8993; }
     .resources-empty, .stats-loading { color: $dark-font-color3; }
 }
 
@@ -929,12 +943,14 @@ export default {
 }
 
 @media (max-width: 767px) {
-    .overview-header { align-items: flex-start; flex-direction: column; gap: 10px; margin-inline: -14px; padding-inline: 14px; }
+    .overview-header { align-items: flex-start; flex-direction: column; gap: 10px; margin-inline: -10px; padding-inline: 10px; }
     .converter-panel, .agents-panel, .resources-overview { min-height: 0; padding: 14px; }
     .overview-grid { min-height: auto; }
     .agent-table-head { display: none; }
     .agent-row { grid-template-columns: minmax(80px, 1fr) 80px 48px; }
     .agent-address { display: none; }
+    .resources-heading { flex-wrap: wrap; gap: 10px; }
+    .status-summary { flex-wrap: wrap; row-gap: 6px; }
 }
 
 </style>

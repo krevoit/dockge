@@ -16,45 +16,45 @@
                 </div>
 
                 <div v-if="stack.isManagedByDockge" class="stack-actions">
-                    <button v-if="isEditMode" class="btn btn-primary" :disabled="processing" @click="deployStack">
+                    <button v-if="isEditMode" class="btn btn-primary" :disabled="processing" :title="$t('deployStack')" @click="deployStack">
                         <font-awesome-icon icon="rocket" class="me-1" />
-                        {{ $t("deployStack") }}
+                        <span class="label">{{ $t("deployStack") }}</span>
                     </button>
 
-                    <button v-if="isEditMode" class="btn btn-normal" :disabled="processing" @click="saveStack">
+                    <button v-if="isEditMode" class="btn btn-normal" :disabled="processing" :title="$t('saveStackDraft')" @click="saveStack">
                         <font-awesome-icon icon="save" class="me-1" />
-                        {{ $t("saveStackDraft") }}
+                        <span class="label">{{ $t("saveStackDraft") }}</span>
                     </button>
 
-                    <button v-if="!isEditMode" class="btn btn-secondary" :disabled="processing" @click="enableEditMode">
+                    <button v-if="!isEditMode" class="btn btn-secondary" :disabled="processing" :title="$t('editStack')" @click="enableEditMode">
                         <font-awesome-icon icon="pen" class="me-1" />
-                        {{ $t("editStack") }}
+                        <span class="label">{{ $t("editStack") }}</span>
                     </button>
 
-                    <button v-if="!isEditMode && !active" class="btn btn-primary" :disabled="processing" @click="startStack">
+                    <button v-if="!isEditMode && !active" class="btn btn-primary" :disabled="processing" :title="$t('startStack')" @click="startStack">
                         <font-awesome-icon icon="play" class="me-1" />
-                        {{ $t("startStack") }}
+                        <span class="label">{{ $t("startStack") }}</span>
                     </button>
 
-                    <button v-if="!isEditMode && active" class="btn btn-normal" :disabled="processing" @click="restartStack">
+                    <button v-if="!isEditMode && active" class="btn btn-normal" :disabled="processing" :title="$t('restartStack')" @click="restartStack">
                         <font-awesome-icon icon="rotate" class="me-1" />
-                        {{ $t("restartStack") }}
+                        <span class="label">{{ $t("restartStack") }}</span>
                     </button>
 
-                    <button v-if="!isEditMode" class="btn btn-primary" :disabled="processing" @click="updateStack">
+                    <button v-if="!isEditMode" class="btn btn-primary" :disabled="processing" :title="$t('updateStack')" @click="updateStack">
                         <font-awesome-icon icon="cloud-arrow-down" class="me-1" />
-                        {{ $t("updateStack") }}
+                        <span class="label">{{ $t("updateStack") }}</span>
                     </button>
 
-                    <button v-if="!isEditMode && active" class="btn btn-normal" :disabled="processing" @click="stopStack">
+                    <button v-if="!isEditMode && active" class="btn btn-normal" :disabled="processing" :title="$t('stopStack')" @click="stopStack">
                         <font-awesome-icon icon="stop" class="me-1" />
-                        {{ $t("stopStack") }}
+                        <span class="label">{{ $t("stopStack") }}</span>
                     </button>
 
                     <BDropdown right text="" variant="normal">
                         <BDropdownItem @click="downStack">
                             <font-awesome-icon icon="stop" class="me-1" />
-                            {{ $t("downStack") }}
+                            <span class="label">{{ $t("downStack") }}</span>
                         </BDropdownItem>
                         <BDropdownItem v-if="!isEditMode && !errorDelete" @click="showDeleteDialog = !showDeleteDialog">
                             <font-awesome-icon icon="trash" class="me-1" /> {{ $t("deleteStack") }}
@@ -170,10 +170,10 @@
                                 <label class="form-label">{{ $tc("url", 2) }}</label>
                                 <ArrayInput name="urls" :display-name="$t('url')" placeholder="https://" object-type="x-dockge" />
                             </div>
-                        </div>
-                        <h4 class="mb-3">{{ $tc("network", 2) }}</h4>
-                        <div class="shadow-box big-padding mb-3">
-                            <NetworkInput />
+                            <div>
+                                <label class="form-label">{{ $tc("network", 2) }}</label>
+                                <NetworkInput />
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -221,7 +221,7 @@
                                         :extensions="extensions"
                                         minimal
                                         wrap
-                                        dark
+                                        :dark="$root.isDark"
                                         tab
                                         :disabled="!isEditMode"
                                         :readonly="!isEditMode"
@@ -246,7 +246,7 @@
                                             :extensions="extensions"
                                             minimal
                                             wrap
-                                            dark
+                                            :dark="$root.isDark"
                                             tab
                                             :disabled="!isEditMode"
                                             :readonly="!isEditMode"
@@ -274,7 +274,7 @@
                                     :extensions="extensions"
                                     minimal
                                     wrap
-                                    dark
+                                    :dark="$root.isDark"
                                     tab
                                     :disabled="!isEditMode"
                                     :readonly="!isEditMode"
@@ -296,7 +296,7 @@
                                         :extensions="extensions"
                                         minimal
                                         wrap
-                                        dark
+                                        :dark="$root.isDark"
                                         tab
                                         :disabled="!isEditMode"
                                         :readonly="!isEditMode"
@@ -341,7 +341,7 @@
                                         :extensions="extensionsEnv"
                                         minimal
                                         wrap
-                                        dark
+                                        :dark="$root.isDark"
                                         tab
                                         :disabled="!isEditMode"
                                         :readonly="!isEditMode"
@@ -530,7 +530,7 @@
 import CodeMirror from "vue-codemirror6";
 import { yaml } from "@codemirror/lang-yaml";
 import { python } from "@codemirror/lang-python";
-import { dracula as editorTheme } from "thememirror";
+import { dracula, tomorrow } from "thememirror";
 import { lineNumbers, EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { parseDocument, Document } from "yaml";
 import { RangeSetBuilder } from "@codemirror/state";
@@ -624,16 +624,15 @@ export default {
             return null;
         };
 
-        const extensions = [
-            editorTheme,
+        // The editor theme is added in computed so it can follow the app's light/dark theme
+        const yamlExtensions = [
             yaml(),
             variableHighlight,
             lineNumbers(),
             EditorView.focusChangeEffect.of(focusEffectHandler)
         ];
 
-        const extensionsEnv = [
-            editorTheme,
+        const envExtensions = [
             python(),
             variableHighlight,
             lineNumbers(),
@@ -641,8 +640,8 @@ export default {
         ];
 
         return {
-            extensions,
-            extensionsEnv,
+            yamlExtensions,
+            envExtensions,
             editorFocus
         };
     },
@@ -691,6 +690,14 @@ export default {
         };
     },
     computed: {
+        extensions() {
+            return [ this.$root.isDark ? dracula : tomorrow, ...this.yamlExtensions ];
+        },
+
+        extensionsEnv() {
+            return [ this.$root.isDark ? dracula : tomorrow, ...this.envExtensions ];
+        },
+
         endpointDisplay() {
             return this.$root.endpointDisplayFunction(this.endpoint);
         },
@@ -1316,7 +1323,8 @@ export default {
                     if (!this.jsonConfig.networks[networkName]) {
                         this.jsonConfig.networks[networkName] = externalSet.has(networkName) ? { external: true } : {};
                     } else if (externalSet.has(networkName)) {
-                        this.jsonConfig.networks[networkName] = { ...(this.jsonConfig.networks[networkName] || {}), external: true };
+                        this.jsonConfig.networks[networkName] = { ...(this.jsonConfig.networks[networkName] || {}),
+                            external: true };
                     }
                 }
             }
@@ -1386,12 +1394,23 @@ export default {
 </script>
 
 <style scoped lang="scss">
+
+// Phones: stack actions collapse to icons (each button keeps a title)
+@media (max-width: 575px) {
+    .stack-actions {
+        flex-wrap: nowrap;
+
+        .btn .label { display: none; }
+        .btn .me-1 { margin-right: 0 !important; }
+    }
+}
+
 @import "../styles/vars.scss";
 
 .stack-detail-header {
     align-items: center;
-    background: #12161c;
-    border: 1px solid #333b47;
+    background: var(--cp-12161c);
+    border: 1px solid var(--cp-333b47);
     border-left: 3px solid #6ea8fe;
     border-radius: 8px;
     display: flex;
@@ -1410,7 +1429,7 @@ export default {
     min-width: 0;
 
     h1 {
-        color: #f0f2f5;
+        color: var(--cp-f0f2f5);
         font-size: 21px;
         font-weight: 600;
         line-height: 1;
@@ -1418,7 +1437,7 @@ export default {
     }
 
     small {
-        color: #a5b1c0;
+        color: var(--cp-a5b1c0);
         flex-basis: 100%;
         font-family: "JetBrains Mono", monospace;
         font-size: 11px;
@@ -1446,8 +1465,8 @@ export default {
 .configuration-shell,
 .activity-output-shell,
 .services-section {
-    background: #11151b;
-    border: 1px solid #333b47;
+    background: var(--cp-11151b);
+    border: 1px solid var(--cp-333b47);
     border-radius: 8px;
     overflow: hidden;
 }
@@ -1471,14 +1490,14 @@ export default {
 .activity-output-heading,
 .section-heading {
     align-items: center;
-    border-bottom: 1px solid #303846;
+    border-bottom: 1px solid var(--cp-303846);
     display: flex;
     justify-content: space-between;
     min-height: 48px;
     padding: 8px 12px;
 
     h2 {
-        color: #e7eaee;
+        color: var(--cp-e7eaee);
         font-size: 15px;
         font-weight: 600;
         margin: 0;
@@ -1495,7 +1514,7 @@ export default {
     gap: 9px;
 
     > span {
-        color: #9eacbd;
+        color: var(--cp-9eacbd);
         font-size: 11px;
     }
 }
@@ -1508,7 +1527,7 @@ export default {
 }
 
 .section-heading span {
-    color: #a8b4c3;
+    color: var(--cp-a8b4c3);
     font-size: 12px;
 }
 
@@ -1529,13 +1548,13 @@ export default {
 }
 
 .container-builder {
-    color: #dce4ed;
+    color: var(--cp-dce4ed);
     display: flex;
     flex-direction: column;
     gap: 14px;
 
     .form-label {
-        color: #dce4ed;
+        color: var(--cp-dce4ed);
         font-size: 12px;
         font-weight: 600;
         margin-bottom: 6px;
@@ -1543,20 +1562,20 @@ export default {
 
     .form-control,
     .form-select {
-        background-color: #111923;
-        border-color: #3a4a5b;
-        color: #e7edf4;
+        background-color: var(--cp-111923);
+        border-color: var(--cp-3a4a5b);
+        color: var(--cp-e7edf4);
         font-size: 13px;
         min-height: 37px;
 
         &:focus {
-            background-color: #111923;
+            background-color: var(--cp-111923);
             border-color: #7da8d8;
             box-shadow: 0 0 0 2px rgba(125, 168, 216, 0.18);
-            color: #f5f8fb;
+            color: var(--cp-f5f8fb);
         }
 
-        &::placeholder { color: #738297; }
+        &::placeholder { color: var(--cp-738297); }
     }
 
     .builder-textarea {
@@ -1569,29 +1588,29 @@ export default {
 
     .form-text,
     .form-hint {
-        color: #8d9caf;
+        color: var(--cp-8d9caf);
         font-size: 11px;
     }
 }
 
 .builder-intro {
     align-items: flex-start;
-    background: #151f2c;
-    border: 1px solid #314457;
+    background: var(--cp-151f2c);
+    border: 1px solid var(--cp-314457);
     border-radius: 8px;
     display: flex;
     gap: 11px;
     padding: 12px;
 
     h3 {
-        color: #f2f6fa;
+        color: var(--cp-f2f6fa);
         font-size: 15px;
         font-weight: 600;
         margin: 0 0 3px;
     }
 
     p {
-        color: #a7b5c5;
+        color: var(--cp-a7b5c5);
         font-size: 12px;
         line-height: 1.45;
         margin: 0;
@@ -1603,7 +1622,7 @@ export default {
     background: rgba(110, 168, 254, 0.14);
     border: 1px solid rgba(110, 168, 254, 0.3);
     border-radius: 7px;
-    color: #9cc4f6;
+    color: var(--cp-9cc4f6);
     display: inline-flex;
     flex: 0 0 31px;
     height: 31px;
@@ -1611,8 +1630,8 @@ export default {
 }
 
 .builder-section {
-    background: #101722;
-    border: 1px solid #2d3c4c;
+    background: var(--cp-101722);
+    border: 1px solid var(--cp-2d3c4c);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
@@ -1626,13 +1645,13 @@ export default {
     gap: 9px;
 
     span {
-        color: #edf2f7;
+        color: var(--cp-edf2f7);
         font-size: 12px;
         font-weight: 600;
     }
 
     small {
-        color: #8696a8;
+        color: var(--cp-8696a8);
         font-size: 10px;
     }
 }
@@ -1650,15 +1669,15 @@ export default {
     background: rgba(91, 214, 154, 0.08);
     border: 1px solid rgba(91, 214, 154, 0.22);
     border-radius: 7px;
-    color: #a9cdb8;
+    color: var(--cp-a9cdb8);
     display: flex;
     font-size: 11px;
     gap: 8px;
     line-height: 1.45;
     padding: 9px 11px;
 
-    svg { color: #70d39b; }
-    strong { color: #d3f0df; font-weight: 600; }
+    svg { color: var(--cp-70d39b); }
+    strong { color: var(--cp-d3f0df); font-weight: 600; }
 }
 
 .builder-actions {
@@ -1685,7 +1704,7 @@ export default {
     gap: 10px;
 
     > span {
-        color: #75dfa9;
+        color: var(--cp-75dfa9);
         font-size: 12px;
     }
 }
@@ -1705,17 +1724,17 @@ export default {
 
 .compose-pane,
 .environment-pane {
-    background: #0c1016;
+    background: var(--cp-0c1016);
     min-width: 0;
 }
 
-.compose-pane { border-right: 1px solid #303846; }
+.compose-pane { border-right: 1px solid var(--cp-303846); }
 
 .pane-title {
     align-items: center;
-    background: #141922;
-    border-bottom: 1px solid #303846;
-    color: #e7edf4;
+    background: var(--cp-141922);
+    border-bottom: 1px solid var(--cp-303846);
+    color: var(--cp-e7edf4);
     display: flex;
     font-size: 13px;
     font-weight: 600;
@@ -1725,7 +1744,7 @@ export default {
     padding: 9px 12px;
 
     span {
-        color: #9eacbd;
+        color: var(--cp-9eacbd);
         font-family: "JetBrains Mono", monospace;
         font-size: 10px;
         font-weight: 400;
@@ -1733,7 +1752,7 @@ export default {
 }
 
 .environment-table {
-    background: #0c1016;
+    background: var(--cp-0c1016);
     height: 340px;
     overflow: auto;
 }
@@ -1741,7 +1760,7 @@ export default {
 .environment-table-head,
 .environment-row {
     align-items: center;
-    border-bottom: 1px solid #252930;
+    border-bottom: 1px solid var(--cp-252930);
     display: grid;
     grid-template-columns: minmax(130px, 1fr) minmax(120px, 1.25fr);
     min-height: 42px;
@@ -1749,20 +1768,20 @@ export default {
 }
 
 .environment-table-head {
-    color: #a9b5c4;
+    color: var(--cp-a9b5c4);
     font-size: 11px;
     min-height: 36px;
     font-weight: 500;
 }
 
 .environment-row {
-    color: #d5dde6;
+    color: var(--cp-d5dde6);
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
     gap: 9px;
 
     code {
-        color: #f0c36f;
+        color: var(--cp-f0c36f);
         font-size: inherit;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1776,10 +1795,10 @@ export default {
     }
 
     input {
-        background: #10151d;
-        border: 1px solid #3a4656;
+        background: var(--cp-10151d);
+        border: 1px solid var(--cp-3a4656);
         border-radius: 5px;
-        color: #e1e4e8;
+        color: var(--cp-e1e4e8);
         font-family: inherit;
         font-size: inherit;
         min-height: 29px;
@@ -1791,7 +1810,7 @@ export default {
 .raw-env-button {
     background: transparent;
     border: 0;
-    color: #8fbcff;
+    color: var(--cp-8fbcff);
     font-size: 12px;
     padding: 11px;
 }
@@ -1806,7 +1825,7 @@ export default {
 
 .update-output-shell {
     background: #080b10;
-    border: 1px solid #35404d;
+    border: 1px solid var(--cp-35404d);
     border-left: 3px solid #f0b35a;
     border-radius: 7px;
     overflow: hidden;
@@ -1818,8 +1837,8 @@ export default {
 
 .update-output-heading {
     align-items: center;
-    background: #11161d;
-    border-bottom: 1px solid #303946;
+    background: var(--cp-11161d);
+    border-bottom: 1px solid var(--cp-303946);
     display: flex;
     justify-content: space-between;
     min-height: 38px;
@@ -1832,13 +1851,13 @@ export default {
     }
 
     strong {
-        color: #edf2f7;
+        color: var(--cp-edf2f7);
         font-size: 12px;
         font-weight: 600;
     }
 
     > span {
-        color: #a2afbf;
+        color: var(--cp-a2afbf);
         font-size: 10px;
     }
 }
@@ -1854,7 +1873,7 @@ export default {
     min-height: 48px;
 
     span {
-        color: #75dfa9;
+        color: var(--cp-75dfa9);
         font-size: 12px;
     }
 }
@@ -1874,7 +1893,7 @@ export default {
 }
 
 :deep(.cm-variable-highlight) {
-    color: #7eabe9;
+    color: var(--cp-7eabe9);
     font-weight: 600;
 }
 
@@ -1888,7 +1907,7 @@ export default {
     padding: 0;
 
     &.edit-mode {
-        background-color: #0c1118 !important;
+        background-color: var(--cp-0c1118) !important;
         box-shadow: inset 3px 0 0 #6ea8fe;
     }
 
@@ -1896,7 +1915,7 @@ export default {
 }
 
 :deep(.editor-box .cm-editor) {
-    background: #0b0f15;
+    background: var(--cp-0b0f15);
     height: 340px;
 }
 
@@ -1906,9 +1925,9 @@ export default {
 }
 
 :deep(.editor-box .cm-gutters) {
-    background: #10151c;
-    border-right-color: #303846;
-    color: #8390a1;
+    background: var(--cp-10151c);
+    border-right-color: var(--cp-303846);
+    color: var(--cp-8390a1);
 }
 
 .expand-button {
@@ -1917,7 +1936,7 @@ export default {
     right: 15px;
     top: 15px;
     z-index: 10;
-    color: #9badc1;
+    color: var(--cp-9badc1);
 }
 
 .expand-button svg {
@@ -1930,7 +1949,7 @@ export default {
 }
 
 .agent-name {
-    color: #a4b0bf;
+    color: var(--cp-a4b0bf);
     font-size: 11px;
 }
 
@@ -1938,7 +1957,7 @@ export default {
     background: rgba($primary, 0.12);
     border: 1px solid rgba($primary, 0.35);
     border-radius: 4px;
-    color: #e0b25b;
+    color: var(--cp-e0b25b);
     display: inline-flex;
     font-size: 11px;
     padding: 3px 6px;
@@ -1947,7 +1966,7 @@ export default {
 
 @media (max-width: 1100px) {
     .configuration-grid { grid-template-columns: 1fr; }
-    .compose-pane { border-bottom: 1px solid #2b2f36; border-right: 0; }
+    .compose-pane { border-bottom: 1px solid var(--cp-2b2f36); border-right: 0; }
     .editor-box,
     :deep(.editor-box .cm-editor),
     .environment-table { height: 310px; }
@@ -1973,5 +1992,118 @@ export default {
     .configuration-state { flex-wrap: wrap; justify-content: flex-end; }
     .create-stack-fields { grid-template-columns: 1fr; }
     .builder-grid-two { grid-template-columns: 1fr; }
+}
+</style>
+
+<style lang="scss">
+// Compose page colours: dark values are the original design, light values added for the light theme
+:root, .light {
+    --cp-0b0f15: #f7f8fa;
+    --cp-0c1016: #f7f8fa;
+    --cp-0c1118: #f7f8fa;
+    --cp-10151c: #f3f5f8;
+    --cp-10151d: #ffffff;
+    --cp-101722: #f7f8fa;
+    --cp-11151b: #ffffff;
+    --cp-11161d: #f3f5f8;
+    --cp-111923: #ffffff;
+    --cp-12161c: #ffffff;
+    --cp-141922: #f3f5f8;
+    --cp-151f2c: #eef4fd;
+    --cp-252930: #e8eaed;
+    --cp-2b2f36: #d9dce1;
+    --cp-2d3c4c: #d9dce1;
+    --cp-303846: #d9dce1;
+    --cp-303946: #d9dce1;
+    --cp-314457: #d9dce1;
+    --cp-333b47: #d9dce1;
+    --cp-35404d: #d9dce1;
+    --cp-3a4656: #d9dce1;
+    --cp-3a4a5b: #d9dce1;
+    --cp-70d39b: #1f8a55;
+    --cp-738297: #5f656d;
+    --cp-75dfa9: #1f8a55;
+    --cp-7eabe9: #2f6fc4;
+    --cp-8390a1: #5f656d;
+    --cp-8696a8: #5f656d;
+    --cp-8d9caf: #5f656d;
+    --cp-8fbcff: #2f6fc4;
+    --cp-9badc1: #5f656d;
+    --cp-9cc4f6: #2f6fc4;
+    --cp-9eacbd: #5f656d;
+    --cp-a2afbf: #5f656d;
+    --cp-a4b0bf: #5f656d;
+    --cp-a5b1c0: #5f656d;
+    --cp-a7b5c5: #5f656d;
+    --cp-a8b4c3: #5f656d;
+    --cp-a9b5c4: #5f656d;
+    --cp-a9cdb8: #3d6b52;
+    --cp-d3f0df: #1d5c3a;
+    --cp-d5dde6: #1d232b;
+    --cp-dce4ed: #1d232b;
+    --cp-e0b25b: #9a6a10;
+    --cp-e1e4e8: #1d232b;
+    --cp-e7eaee: #1d232b;
+    --cp-e7edf4: #1d232b;
+    --cp-edf2f7: #1d232b;
+    --cp-f0c36f: #9a6a10;
+    --cp-f0f2f5: #1d232b;
+    --cp-f2f6fa: #1d232b;
+    --cp-f5f8fb: #1d232b;
+}
+
+.dark {
+    --cp-0b0f15: #0b0f15;
+    --cp-0c1016: #0c1016;
+    --cp-0c1118: #0c1118;
+    --cp-10151c: #10151c;
+    --cp-10151d: #10151d;
+    --cp-101722: #101722;
+    --cp-11151b: #11151b;
+    --cp-11161d: #11161d;
+    --cp-111923: #111923;
+    --cp-12161c: #12161c;
+    --cp-141922: #141922;
+    --cp-151f2c: #151f2c;
+    --cp-252930: #252930;
+    --cp-2b2f36: #2b2f36;
+    --cp-2d3c4c: #2d3c4c;
+    --cp-303846: #303846;
+    --cp-303946: #303946;
+    --cp-314457: #314457;
+    --cp-333b47: #333b47;
+    --cp-35404d: #35404d;
+    --cp-3a4656: #3a4656;
+    --cp-3a4a5b: #3a4a5b;
+    --cp-70d39b: #70d39b;
+    --cp-738297: #738297;
+    --cp-75dfa9: #75dfa9;
+    --cp-7eabe9: #7eabe9;
+    --cp-8390a1: #8390a1;
+    --cp-8696a8: #8696a8;
+    --cp-8d9caf: #8d9caf;
+    --cp-8fbcff: #8fbcff;
+    --cp-9badc1: #9badc1;
+    --cp-9cc4f6: #9cc4f6;
+    --cp-9eacbd: #9eacbd;
+    --cp-a2afbf: #a2afbf;
+    --cp-a4b0bf: #a4b0bf;
+    --cp-a5b1c0: #a5b1c0;
+    --cp-a7b5c5: #a7b5c5;
+    --cp-a8b4c3: #a8b4c3;
+    --cp-a9b5c4: #a9b5c4;
+    --cp-a9cdb8: #a9cdb8;
+    --cp-d3f0df: #d3f0df;
+    --cp-d5dde6: #d5dde6;
+    --cp-dce4ed: #dce4ed;
+    --cp-e0b25b: #e0b25b;
+    --cp-e1e4e8: #e1e4e8;
+    --cp-e7eaee: #e7eaee;
+    --cp-e7edf4: #e7edf4;
+    --cp-edf2f7: #edf2f7;
+    --cp-f0c36f: #f0c36f;
+    --cp-f0f2f5: #f0f2f5;
+    --cp-f2f6fa: #f2f6fa;
+    --cp-f5f8fb: #f5f8fb;
 }
 </style>
