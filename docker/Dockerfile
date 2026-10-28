@@ -6,7 +6,8 @@ FROM krevoit/dockge:build-healthcheck AS build_healthcheck
 ############################################
 # Build frontend
 ############################################
-FROM krevoit/dockge:base AS build_frontend
+# The frontend bundle is the same on every architecture, so build it once on the build machine
+FROM --platform=$BUILDPLATFORM krevoit/dockge:base AS build_frontend
 WORKDIR /app
 COPY --chown=node:node . .
 RUN --mount=type=cache,id=npm,target=/npm/store \

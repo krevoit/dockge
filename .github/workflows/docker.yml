@@ -26,20 +26,29 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
+    env:
+      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/dockge
+      HUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/dockge
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Resolve Docker tag
+      - name: Resolve Docker tags
         id: vars
         run: |
           # next-dev is the main branch: pushes publish `latest`. The `next-dev` tag is kept
           # as an alias so existing installs pinned to it keep receiving updates.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "tags=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "tags=latest next-dev" >> "$GITHUB_OUTPUT"
           fi
+
+      # arm64 steps that run commands (apt, npm ci) need emulation; the Go healthcheck
+      # cross-compiles and the frontend is built once on the runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -57,62 +66,60 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Dockge base image
+      # Push only the commit tag first; `latest` moves after both architectures pass the smoke test
+      - name: Build and push linux/amd64 + linux/arm64
+        env:
+          TAGS: ${{ env.GHCR_IMAGE }}:${{ github.sha }},${{ env.HUB_IMAGE }}:${{ github.sha }}
         run: |
-          docker build . \
-            --file docker/Base.Dockerfile \
-            --tag krevoit/dockge:base
+          for attempt in 1 2 3; do
+            if docker buildx bake --push \
+                --set "*.cache-from=type=gha" \
+                --set "*.cache-to=type=gha,mode=max" \
+                release; then
+              exit 0
+            fi
+            echo "Build or push failed (attempt $attempt/3), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
-      - name: Build Dockge healthcheck image
+      - name: Smoke test both architectures
         run: |
-          docker build . \
-            --file docker/BuildHealthCheck.Dockerfile \
-            --tag krevoit/dockge:build-healthcheck
-
-      - name: Build Docker image
-        run: |
-          alias_tags=""
-          if [ "${{ github.event_name }}" = "push" ]; then
-            alias_tags="--tag ghcr.io/${{ github.repository_owner }}/dockge:next-dev --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:next-dev"
-          fi
-          docker build . \
-            --file docker/Dockerfile \
-            --target release \
-            --tag ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }} \
-            --tag ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }} \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }} \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }} \
-            $alias_tags
-
-      - name: Push Docker image
-        run: |
-          push_retry() {
-            local img="$1"
-            local attempt=1
-            while [ $attempt -le 4 ]; do
-              if docker push "$img"; then
-                return 0
-              fi
-              echo "Push of $img failed (attempt $attempt/4), retrying in 15s..."
-              sleep 15
-              attempt=$((attempt + 1))
+          for platform in linux/amd64 linux/arm64; do
+            echo "::group::$platform"
+            image="$GHCR_IMAGE:${{ github.sha }}"
+            docker pull --quiet --platform "$platform" "$image"
+            docker run --rm --platform "$platform" --entrypoint node "$image" -e '
+              require("/app/node_modules/sqlite3");
+              require("/app/node_modules/@homebridge/node-pty-prebuilt-multiarch");
+              console.log("native modules load on", process.arch);'
+            docker run -d --name smoke --platform "$platform" "$image"
+            ok=""
+            for i in $(seq 1 60); do
+              if docker exec smoke /app/extra/healthcheck >/dev/null 2>&1; then ok=1; break; fi
+              sleep 5
             done
-            echo "Push of $img failed after 4 attempts"
-            return 1
-          }
-          push_retry ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }}
-          push_retry ghcr.io/${{ github.repository_owner }}/dockge:${{ github.sha }}
-          push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ steps.vars.outputs.tag }}
-          push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:${{ github.sha }}
-          if [ "${{ github.event_name }}" = "push" ]; then
-            push_retry ghcr.io/${{ github.repository_owner }}/dockge:next-dev
-            push_retry ${{ secrets.DOCKERHUB_USERNAME }}/dockge:next-dev
-          fi
+            docker logs smoke 2>&1 | tail -20
+            docker rm -f smoke >/dev/null
+            echo "::endgroup::"
+            if [ -z "$ok" ]; then
+              echo "::error::$platform image did not become healthy"
+              exit 1
+            fi
+          done
+
+      - name: Tag release
+        run: |
+          for tag in ${{ steps.vars.outputs.tags }}; do
+            docker buildx imagetools create --tag "$GHCR_IMAGE:$tag" "$GHCR_IMAGE:${{ github.sha }}"
+            docker buildx imagetools create --tag "$HUB_IMAGE:$tag" "$HUB_IMAGE:${{ github.sha }}"
+          done
+          docker buildx imagetools inspect "$GHCR_IMAGE:${{ github.sha }}"
 
       - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/dockge:${{ steps.vars.outputs.tag }}
+          image-ref: ${{ env.GHCR_IMAGE }}:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
