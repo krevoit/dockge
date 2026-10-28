@@ -12,7 +12,7 @@
         <!-- Desktop header -->
         <header v-if="! $root.isMobile || $root.loggedIn" class="app-rail">
             <router-link to="/" class="app-brand">
-                <object class="brand-mark" width="40" height="40" data="/icon.svg" />
+                <img class="brand-mark" width="28" height="28" src="/icon.svg" alt="" />
                 <span class="fs-4 title">Dockge</span>
             </router-link>
 

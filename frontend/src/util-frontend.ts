@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
-import timezones from "timezones-list";
+// Import the JSON data directly: the package's CommonJS wrapper double-wraps the default export under Vite 8 (Rolldown)
+import timezones from "timezones-list/dist/timezones.json";
 import { localeDirection, currentLocale } from "./i18n";
 import { POSITION } from "vue-toastification";
 
