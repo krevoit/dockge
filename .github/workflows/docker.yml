@@ -61,13 +61,13 @@ jobs:
         run: |
           docker build . \
             --file docker/Base.Dockerfile \
-            --tag cmcooper1980/dockge:base
+            --tag krevoit/dockge:base
 
       - name: Build Dockge healthcheck image
         run: |
           docker build . \
             --file docker/BuildHealthCheck.Dockerfile \
-            --tag cmcooper1980/dockge:build-healthcheck
+            --tag krevoit/dockge:build-healthcheck
 
       - name: Build Docker image
         run: |

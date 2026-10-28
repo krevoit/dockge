@@ -1,12 +1,12 @@
 ############################################
 # Healthcheck Binary
 ############################################
-FROM cmcooper1980/dockge:build-healthcheck AS build_healthcheck
+FROM krevoit/dockge:build-healthcheck AS build_healthcheck
 
 ############################################
 # Build frontend
 ############################################
-FROM cmcooper1980/dockge:base AS build_frontend
+FROM krevoit/dockge:base AS build_frontend
 WORKDIR /app
 COPY --chown=node:node . .
 RUN --mount=type=cache,id=npm,target=/npm/store \
@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=npm,target=/npm/store \
 ############################################
 # Install node modules
 ############################################
-FROM cmcooper1980/dockge:base AS build_nodemodules
+FROM krevoit/dockge:base AS build_nodemodules
 WORKDIR /app
 COPY --chown=node:node  ./package.json ./package.json
 COPY --chown=node:node  ./package-lock.json ./package-lock.json
@@ -25,7 +25,7 @@ RUN npm ci --omit=dev
 ############################################
 # ⭐ Main Image
 ############################################
-FROM cmcooper1980/dockge:base AS release
+FROM krevoit/dockge:base AS release
 WORKDIR /app
 COPY --chown=node:node --from=build_healthcheck /app/extra/healthcheck /app/extra/healthcheck
 COPY --from=build_frontend /app/frontend-dist /app/frontend-dist

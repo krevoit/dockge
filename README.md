@@ -6,7 +6,7 @@
 
 A fancy, easy-to-use and reactive self-hosted docker compose stack-oriented manager forked from louislam/dockge that has had several Pull Requests merged.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/cmcooper1980/dockge?logo=github&style=flat)](https://github.com/cmcooper1980/dockge) [![Docker Pulls](https://img.shields.io/docker/pulls/cmcooper1980/dockge?logo=docker)](https://hub.docker.com/r/cmcooper1980/dockge/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/cmcooper1980/dockge/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/cmcooper1980/dockge/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/cmcooper1980/dockge/master?logo=github)](https://github.com/cmcooper1980/dockge/commits/master/)
+[![GitHub Repo stars](https://img.shields.io/github/stars/krevoit/dockge?logo=github&style=flat)](https://github.com/krevoit/dockge) [![Docker Pulls](https://img.shields.io/docker/pulls/krevoit/dockge?logo=docker)](https://hub.docker.com/r/krevoit/dockge/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/krevoit/dockge/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/krevoit/dockge/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/krevoit/dockge/next-dev?logo=github)](https://github.com/krevoit/dockge/commits/next-dev/)
 
 <img width="3840" height="1937" alt="image" src="https://github.com/user-attachments/assets/3bb5aec8-e17a-43cb-8f15-908047282043" />
 
