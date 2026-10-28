@@ -77,6 +77,12 @@ export interface DeleteOptions {
     deleteStackFiles: boolean
 }
 
+export interface StackUpdateDetail {
+    service: string;
+    image: string;
+    remoteDigest: string;
+}
+
 export class Stack {
 
     name: string;
@@ -90,6 +96,7 @@ export class Stack {
     protected server: DockgeServer;
     protected _hasUpdates: boolean = false;
     protected _updateServices: string[] = [];
+    protected _updateDetails: StackUpdateDetail[] = [];
 
     protected combinedTerminal? : Terminal;
 
@@ -153,6 +160,13 @@ export class Stack {
             composeOverrideYAML: this.composeOverrideYAML,
             primaryHostname,
         };
+    }
+
+    /**
+     * Services with an image update, as found by the last forced update check
+     */
+    get updateDetails() : StackUpdateDetail[] {
+        return this._updateDetails;
     }
 
     toSimpleJSON(endpoint : string) : object {
@@ -668,6 +682,7 @@ export class Stack {
 
         const cacheKey = this.fullPath;
         const updateServices: string[] = [];
+        const updateDetails: StackUpdateDetail[] = [];
         Stack.imageRepository.resetStack(this.name);
 
         try {
@@ -694,6 +709,11 @@ export class Stack {
                         const imageInfo = await Stack.imageRepository.update(this.name, serviceName, image);
                         if (imageInfo.isImageUpdateAvailable()) {
                             updateServices.push(serviceName);
+                            updateDetails.push({
+                                service: serviceName,
+                                image,
+                                remoteDigest: imageInfo.remoteDigest,
+                            });
                         }
                     } catch (e) {
                         log.error("updateImageInfos", `Stack '${this.name}' service '${serviceName}' - Image '${image}': ${e}`);
@@ -710,6 +730,7 @@ export class Stack {
 
         this._hasUpdates = hasUpdates;
         this._updateServices = uniqueUpdateServices;
+        this._updateDetails = updateDetails;
         Stack.updateInfoCache.set(cacheKey, {
             checkedAt: Date.now(),
             hasUpdates,

@@ -72,21 +72,33 @@
                 {{ $t("deleteContainer") }}
             </button>
         </div>
-        <div v-else-if="statsInstances.length > 0" class="mt-2">
-            <div class="d-flex align-items-center gap-3">
-                <template v-if="!expandedStats">
-                    <div class="stats">
-                        {{ $t('CPU') }}: {{ statsInstances[0].CPUPerc }}
+        <div v-else-if="liveStats" class="mt-2">
+            <div class="live-stats">
+                <div class="meter" :title="cpuTitle">
+                    <div class="meter-head">
+                        <span class="meter-label">{{ $t("CPU") }}</span>
+                        <span class="meter-value">{{ formatPercent(liveStats.cpu) }}</span>
                     </div>
-                    <div class="stats">
-                        {{ $t('memoryAbbreviated') }}: {{ statsInstances[0].MemUsage }}
+                    <Sparkline class="meter-spark cpu" :values="cpuHistory" :min-scale="1" />
+                    <div class="meter-bar">
+                        <div class="meter-fill cpu" :class="levelClass(cpuBarPercent)" :style="{ width: cpuBarPercent + '%' }"></div>
                     </div>
-                </template>
-                <div class="d-flex flex-grow-1 justify-content-end">
-                    <button class="btn btn-sm btn-normal" @click="expandedStats = !expandedStats">
-                        <font-awesome-icon :icon="expandedStats ? 'chevron-up' : 'chevron-down'" />
-                    </button>
                 </div>
+                <div class="meter" :title="memTitle">
+                    <div class="meter-head">
+                        <span class="meter-label">{{ $t("memory") }}</span>
+                        <span class="meter-value">
+                            {{ formatBytes(liveStats.mem) }}<span v-if="liveStats.memLimit" class="meter-limit"> / {{ formatBytes(liveStats.memLimit) }}</span>
+                        </span>
+                    </div>
+                    <Sparkline class="meter-spark mem" :values="memHistory" />
+                    <div class="meter-bar">
+                        <div class="meter-fill mem" :class="levelClass(memBarPercent)" :style="{ width: memBarPercent + '%' }"></div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-normal stats-toggle" :aria-expanded="expandedStats" :title="$t('networkIO') + ' / ' + $t('blockIO')" @click="expandedStats = !expandedStats">
+                    <font-awesome-icon :icon="expandedStats ? 'chevron-up' : 'chevron-down'" />
+                </button>
             </div>
             <transition name="slide-fade" appear>
                 <div v-if="expandedStats" class="d-flex flex-column gap-3 mt-2">
@@ -153,6 +165,8 @@ import { defineComponent } from "vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { parseDockerPort } from "../../../common/util-common";
 import DockerStat from "./DockerStat.vue";
+import Sparkline from "./Sparkline.vue";
+import { formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
 import ArrayInput from "./ArrayInput.vue";
 import ArraySelect from "./ArraySelect.vue";
 
@@ -160,6 +174,7 @@ export default defineComponent({
     components: {
         FontAwesomeIcon,
         DockerStat,
+        Sparkline,
         ArrayInput,
         ArraySelect
     },
@@ -179,6 +194,16 @@ export default defineComponent({
         dockerStats: {
             type: Object,
             default: null,
+        },
+        // { ncpu, memTotal } of the Docker host (missing on older agents)
+        dockerHost: {
+            type: Object,
+            default: null,
+        },
+        // Recent { cpu, mem } samples for this service, newest last
+        statsHistory: {
+            type: Array,
+            default: () => [],
         },
         updateServices: {
             type: Array,
@@ -330,6 +355,42 @@ export default defineComponent({
         updateTitle() {
             return `${this.$t("updateAvailable")}: ${this.envsubstService.image || this.name}`;
         },
+        liveStats() {
+            if (this.statsInstances.length === 0) {
+                return null;
+            }
+            const summary = summarizeDockerStats(this.statsInstances);
+            // Without a memory limit docker reports the host's total memory for every replica
+            const hostMem = this.dockerHost?.memTotal;
+            if (hostMem && summary.memLimit > hostMem) {
+                summary.memLimit = hostMem;
+            }
+            return summary;
+        },
+        cpuBarPercent() {
+            // docker stats reports CPU relative to one core; scale the bar to the whole host
+            const cores = this.dockerHost?.ncpu || 1;
+            return Math.min(100, this.liveStats.cpu / cores);
+        },
+        memBarPercent() {
+            if (!this.liveStats.memLimit) {
+                return 0;
+            }
+            return Math.min(100, this.liveStats.mem / this.liveStats.memLimit * 100);
+        },
+        cpuHistory() {
+            return this.statsHistory.map(s => s.cpu);
+        },
+        memHistory() {
+            return this.statsHistory.map(s => s.mem);
+        },
+        cpuTitle() {
+            const cores = this.dockerHost?.ncpu;
+            return cores ? this.$t("cpuStatTitle", { cores }) : this.$t("CPU");
+        },
+        memTitle() {
+            return this.$t("memStatTitle", { percent: this.memBarPercent.toFixed(1) });
+        },
         statsInstances() {
             if (!this.serviceStatus) {
                 return [];
@@ -348,6 +409,17 @@ export default defineComponent({
         }
     },
     methods: {
+        formatBytes,
+        formatPercent,
+        levelClass(percent) {
+            if (percent >= 95) {
+                return "danger";
+            }
+            if (percent >= 85) {
+                return "warn";
+            }
+            return "";
+        },
         parsePort(port) {
             if (this.stack.endpoint) {
                 return parseDockerPort(port, this.stack.primaryHostname);
@@ -478,9 +550,90 @@ export default defineComponent({
         }
     }
 
-    .stats {
-        color: var(--ct-a8b3c1);
+    .live-stats {
+        align-items: end;
+        border-top: 1px solid var(--ct-292e35);
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr 1fr auto;
+        padding-top: 8px;
+    }
+
+    .meter {
+        min-width: 0;
+    }
+
+    .meter-head {
+        align-items: baseline;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        margin-bottom: 2px;
+    }
+
+    .meter-label {
+        color: var(--ct-89919c);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .meter-value {
+        color: var(--ct-e5e8ec);
+        font-family: "JetBrains Mono", monospace;
         font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .meter-limit {
+        color: var(--ct-89919c);
+    }
+
+    .meter-spark {
+        --spark-height: 26px;
+
+        &.cpu {
+            color: var(--stat-cpu);
+        }
+
+        &.mem {
+            color: var(--stat-mem);
+        }
+    }
+
+    .meter-bar {
+        background: var(--stat-track);
+        border-radius: 2px;
+        height: 3px;
+        margin-top: 3px;
+        overflow: hidden;
+    }
+
+    .meter-fill {
+        border-radius: 2px;
+        height: 100%;
+        transition: width 0.6s ease;
+
+        &.cpu {
+            background: var(--stat-cpu);
+        }
+
+        &.mem {
+            background: var(--stat-mem);
+        }
+
+        &.warn {
+            background: var(--stat-warn);
+        }
+
+        &.danger {
+            background: var(--stat-danger);
+        }
+    }
+
+    .stats-toggle {
+        align-self: center;
     }
 
 }
@@ -493,6 +646,21 @@ export default defineComponent({
 
     .container .function,
     .container .action-group { justify-content: start; }
+}
+
+@media (max-width: 576px) {
+    .container .live-stats {
+        gap: 10px;
+        grid-template-columns: 1fr 1fr auto;
+    }
+
+    .container .meter-value {
+        font-size: 11px;
+    }
+
+    .container .meter-limit {
+        display: none;
+    }
 }
 </style>
 

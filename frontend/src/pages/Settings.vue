@@ -86,6 +86,9 @@ export default {
                 globalEnv: {
                     title: this.$t("GlobalEnv"),
                 },
+                notifications: {
+                    title: this.$t("Notifications"),
+                },
                 about: {
                     title: this.$t("About"),
                 },
@@ -128,6 +131,17 @@ export default {
                 }
                 if (!this.settings.stackUpdateCheckIntervalHours) {
                     this.settings.stackUpdateCheckIntervalHours = 6;
+                }
+                if (!this.settings.notificationWebhookFormat) {
+                    this.settings.notificationWebhookFormat = "json";
+                }
+                if (!this.settings.notificationCooldownMinutes) {
+                    this.settings.notificationCooldownMinutes = 15;
+                }
+                for (const key of [ "notifyImageUpdates", "notifyContainerCrash", "notifyContainerUnhealthy" ]) {
+                    if (this.settings[key] === undefined) {
+                        this.settings[key] = true;
+                    }
                 }
                 this.settingsLoaded = true;
             });
@@ -176,6 +190,19 @@ export default {
                 return {
                     success: false,
                     msg: this.$t("Invalid update check interval"),
+                };
+            }
+            const cooldown = Number(this.settings.notificationCooldownMinutes);
+            if (!Number.isInteger(cooldown) || cooldown < 1 || cooldown > 1440) {
+                return {
+                    success: false,
+                    msg: this.$t("Invalid notification cooldown"),
+                };
+            }
+            if (this.settings.notificationWebhookUrl && !/^https?:\/\//i.test(this.settings.notificationWebhookUrl)) {
+                return {
+                    success: false,
+                    msg: this.$t("Webhook URL must start with http:// or https://"),
                 };
             }
             return {

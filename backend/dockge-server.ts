@@ -27,6 +27,8 @@ import expressStaticGzip from "express-static-gzip";
 import path from "path";
 import { TerminalSocketHandler } from "./agent-socket-handlers/terminal-socket-handler";
 import { Stack } from "./stack";
+import { DockerStatsMonitor } from "./docker-stats-monitor";
+import { NotificationManager } from "./notification";
 import { Cron } from "croner";
 import gracefulShutdown from "http-graceful-shutdown";
 import User from "./models/user";
@@ -81,6 +83,8 @@ export class DockgeServer {
     stacksDir : string = "";
     stackUpdateCheckTimer? : NodeJS.Timeout;
     stackUpdateCheckPromise? : Promise<void>;
+    dockerStatsMonitor = new DockerStatsMonitor();
+    notificationManager = new NotificationManager();
 
     /**
      *
@@ -89,7 +93,7 @@ export class DockgeServer {
         // Catch unexpected errors here
         let unexpectedErrorHandler = (error : unknown) => {
             console.trace(error);
-            console.error("If you keep encountering errors, please report to https://github.com/cmcooper1980/dockge");
+            console.error("If you keep encountering errors, please report to https://github.com/krevoit/dockge/issues");
         };
         process.addListener("unhandledRejection", unexpectedErrorHandler);
         process.addListener("uncaughtException", unexpectedErrorHandler);
@@ -429,6 +433,9 @@ export class DockgeServer {
             this.startStackUpdateCheckScheduler().catch((e) => {
                 log.error("stack-update-checker", e);
             });
+            this.notificationManager.refresh().catch((e) => {
+                log.error("notification", e);
+            });
             checkVersion.startInterval();
         });
 
@@ -437,7 +444,7 @@ export class DockgeServer {
             timeout: 30000,                   // timeout: 30 secs
             development: false,               // not in dev mode
             forceExit: true,                  // triggers process.exit() at the end of shutdown process
-            onShutdown: this.shutdownFunction,     // shutdown function (async) - e.g. for cleanup DB, ...
+            onShutdown: (signal) => this.shutdownFunction(signal), // shutdown function (async) - e.g. for cleanup DB, ...
             finally: this.finalFunction,            // finally function (sync) - e.g. for logging
         });
 
@@ -672,6 +679,7 @@ export class DockgeServer {
         }
         await Settings.set("stackUpdateCheckLastRun", Date.now(), "general");
         await this.sendStackList(true);
+        await this.notificationManager.notifyImageUpdates(stackList.values());
         log.info("stack-update-checker", `Finished: ${stacksWithUpdates} stack(s), ${servicesWithUpdates} service(s) with updates`);
     }
 
@@ -759,31 +767,11 @@ export class DockgeServer {
     }
 
     async getDockerStats() : Promise<Map<string, object>> {
-        let stats = new Map<string, object>();
-
         try {
-            let res = await childProcessAsync.spawn("docker", [ "stats", "--format", "json", "--no-stream" ], {
-                encoding: "utf-8",
-            });
-
-            if (!res.stdout) {
-                return stats;
-            }
-
-            let lines = res.stdout?.toString().split("\n");
-
-            for (let line of lines) {
-                try {
-                    let obj = JSON.parse(line);
-                    stats.set(obj.Name, obj);
-                } catch (e) {
-                }
-            }
-
-            return stats;
+            return await this.dockerStatsMonitor.getStats();
         } catch (e) {
             log.error("getDockerStats", e);
-            return stats;
+            return new Map();
         }
     }
 
@@ -801,6 +789,8 @@ export class DockgeServer {
         log.info("server", "Called signal: " + signal);
 
         // TODO: Close all terminals?
+        this.dockerStatsMonitor.stop();
+        this.notificationManager.stop();
         if (this.stackUpdateCheckTimer) {
             clearTimeout(this.stackUpdateCheckTimer);
             this.stackUpdateCheckTimer = undefined;

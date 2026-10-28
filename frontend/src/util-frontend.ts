@@ -187,3 +187,89 @@ export function getToastErrorTimeout() {
     return errorTimeout;
 }
 
+const DOCKER_SIZE_UNITS : Record<string, number> = {
+    b: 1,
+    kb: 1e3,
+    mb: 1e6,
+    gb: 1e9,
+    tb: 1e12,
+    kib: 1024,
+    mib: 1024 ** 2,
+    gib: 1024 ** 3,
+    tib: 1024 ** 4,
+};
+
+/**
+ * Parse a size printed by `docker stats`, e.g. "47.35MiB" or "1.2kB"
+ * @param text Size with unit
+ * @returns Size in bytes (0 if it can't be parsed)
+ */
+export function parseDockerSize(text : unknown) : number {
+    const match = /^\s*([\d.]+)\s*([a-z]*)\s*$/i.exec(String(text ?? ""));
+    if (!match) {
+        return 0;
+    }
+    return parseFloat(match[1]) * (DOCKER_SIZE_UNITS[match[2].toLowerCase()] ?? 1);
+}
+
+/**
+ * Parse a percentage printed by `docker stats`, e.g. "12.50%"
+ * @param text Percentage
+ * @returns The number (0 if it can't be parsed)
+ */
+export function parseDockerPercent(text : unknown) : number {
+    const value = parseFloat(String(text ?? "").replace("%", ""));
+    return Number.isFinite(value) ? value : 0;
+}
+
+interface DockerStatsEntry {
+    CPUPerc?: string;
+    MemUsage?: string;
+}
+
+/**
+ * Add up CPU and memory of one or more `docker stats` entries (e.g. the replicas of a service)
+ * @param instances docker stats entries
+ * @returns cpu in percent of one core, mem and memLimit in bytes
+ */
+export function summarizeDockerStats(instances : DockerStatsEntry[]) {
+    let cpu = 0;
+    let mem = 0;
+    let memLimit = 0;
+    for (const stat of instances) {
+        cpu += parseDockerPercent(stat.CPUPerc);
+        const [ used, limit ] = String(stat.MemUsage ?? "").split("/");
+        mem += parseDockerSize(used);
+        memLimit += parseDockerSize(limit);
+    }
+    return {
+        cpu,
+        mem,
+        memLimit,
+    };
+}
+
+/**
+ * Format bytes with binary units, e.g. 49643274 -> "47.3 MiB"
+ * @param bytes Size in bytes
+ * @returns Formatted size
+ */
+export function formatBytes(bytes : number) : string {
+    const units = [ "B", "KiB", "MiB", "GiB", "TiB" ];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit++;
+    }
+    return `${unit === 0 ? Math.round(value) : value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`;
+}
+
+/**
+ * Format a CPU percentage, keeping two decimals for small values
+ * @param value Percentage
+ * @returns Formatted percentage
+ */
+export function formatPercent(value : number) : string {
+    return `${value.toFixed(value < 10 ? 2 : 1)}%`;
+}

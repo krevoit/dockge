@@ -132,6 +132,18 @@
                             <h2>{{ $t("container", 2) }}</h2>
                             <span>{{ Object.keys(jsonConfig.services || {}).length }} · Compose services</span>
                         </div>
+                        <div v-if="stackStats" class="stack-live-stats" :title="$t('stackLiveStatsTitle')">
+                            <div class="stack-live-stat">
+                                <span class="stack-live-label">{{ $t("CPU") }}</span>
+                                <span class="stack-live-value">{{ formatPercent(stackStats.cpu) }}</span>
+                                <Sparkline class="stack-live-spark cpu" :values="stackCpuHistory" :min-scale="1" />
+                            </div>
+                            <div class="stack-live-stat">
+                                <span class="stack-live-label">{{ $t("memoryAbbreviated") }}</span>
+                                <span class="stack-live-value">{{ formatBytes(stackStats.mem) }}</span>
+                                <Sparkline class="stack-live-spark mem" :values="stackMemHistory" />
+                            </div>
+                        </div>
                         <button v-if="isEditMode" class="btn btn-primary add-container-button" type="button" @click="openContainerBuilder">
                             <font-awesome-icon icon="plus" class="me-1" />
                             {{ $t("addContainer") }}
@@ -146,6 +158,8 @@
                             :is-edit-mode="isEditMode"
                             :serviceStatus="serviceStatusList[name]"
                             :dockerStats="dockerStats"
+                            :docker-host="dockerHost"
+                            :stats-history="statsHistory[name] || []"
                             :update-services="globalStack?.updateServices || []"
                             :runtime-actions="!isAdd && !isEditMode"
                             :creation-mode="isAdd"
@@ -547,6 +561,8 @@ import {
 import { BModal } from "bootstrap-vue-next";
 import NetworkInput from "../components/NetworkInput.vue";
 import ArrayInput from "../components/ArrayInput.vue";
+import Sparkline from "../components/Sparkline.vue";
+import { formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
 import dotenv from "dotenv";
 import { ref } from "vue";
 
@@ -564,6 +580,10 @@ let yamlErrorTimeout = null;
 
 let serviceStatusTimeout = null;
 let dockerStatsTimeout = null;
+
+const DOCKER_STATS_INTERVAL_MS = 2000;
+// 2 minutes of history at one sample every 2 seconds
+const STATS_HISTORY_LENGTH = 60;
 
 // Highlight $VAR and ${VAR}
 const variableHighlight = ViewPlugin.fromClass(class {
@@ -609,6 +629,7 @@ export default {
         FontAwesomeIcon,
         CodeMirror,
         BModal,
+        Sparkline,
     },
     beforeRouteUpdate(to, from, next) {
         this.exitConfirm(next);
@@ -661,6 +682,9 @@ export default {
             },
             serviceStatusList: {},
             dockerStats: {},
+            dockerHost: null,
+            statsHistory: {},
+            stackStatsHistory: [],
             errorDelete: false,
             isEditMode: false,
             configurationExpanded: false,
@@ -690,6 +714,21 @@ export default {
         };
     },
     computed: {
+        stackStats() {
+            if (this.isAdd || this.isEditMode || this.stackStatsHistory.length === 0) {
+                return null;
+            }
+            return this.stackStatsHistory[this.stackStatsHistory.length - 1];
+        },
+
+        stackCpuHistory() {
+            return this.stackStatsHistory.map(s => s.cpu);
+        },
+
+        stackMemHistory() {
+            return this.stackStatsHistory.map(s => s.mem);
+        },
+
         extensions() {
             return [ this.$root.isDark ? dracula : tomorrow, ...this.yamlExtensions ];
         },
@@ -938,7 +977,7 @@ export default {
             clearTimeout(dockerStatsTimeout);
             dockerStatsTimeout = setTimeout(async () => {
                 this.requestDockerStats();
-            }, 5000);
+            }, DOCKER_STATS_INTERVAL_MS);
         },
 
         requestServiceStatus() {
@@ -958,15 +997,60 @@ export default {
         },
 
         requestDockerStats() {
+            // Don't keep docker stats running for a tab nobody is looking at
+            if (document.hidden) {
+                if (!this.stopDockerStatsTimeout) {
+                    this.startDockerStatsTimeout();
+                }
+                return;
+            }
+
             this.$root.emitAgent(this.endpoint, "dockerStats", (res) => {
                 if (res.ok) {
                     this.dockerStats = res.dockerStats;
+                    this.dockerHost = res.dockerHost || null;
+                    this.recordStatsHistory();
                 }
                 if (!this.stopDockerStatsTimeout) {
                     this.startDockerStatsTimeout();
                 }
             });
         },
+
+        /**
+         * Add the latest stats sample per service (replicas summed) and for the whole stack
+         */
+        recordStatsHistory() {
+            const history = { ...this.statsHistory };
+            let cpu = 0;
+            let mem = 0;
+            let hasStats = false;
+
+            for (const [ serviceName, statuses ] of Object.entries(this.serviceStatusList || {})) {
+                const instances = (Array.isArray(statuses) ? statuses : [])
+                    .map(s => this.dockerStats[s.name])
+                    .filter(s => !!s);
+                if (instances.length === 0) {
+                    continue;
+                }
+                const summary = summarizeDockerStats(instances);
+                history[serviceName] = [ ...(history[serviceName] || []), summary ].slice(-STATS_HISTORY_LENGTH);
+                cpu += summary.cpu;
+                mem += summary.mem;
+                hasStats = true;
+            }
+
+            this.statsHistory = history;
+            if (hasStats) {
+                this.stackStatsHistory = [ ...this.stackStatsHistory, {
+                    cpu,
+                    mem,
+                } ].slice(-STATS_HISTORY_LENGTH);
+            }
+        },
+
+        formatBytes,
+        formatPercent,
 
         exitConfirm(next) {
             if (this.isEditMode) {
@@ -1529,6 +1613,69 @@ export default {
 .section-heading span {
     color: var(--cp-a8b4c3);
     font-size: 12px;
+}
+
+.stack-live-stats {
+    align-items: center;
+    display: flex;
+    gap: 18px;
+    margin-left: auto;
+    min-width: 0;
+}
+
+.stack-live-stat {
+    align-items: center;
+    display: flex;
+    gap: 7px;
+
+    .stack-live-label {
+        color: var(--cp-a8b4c3);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .stack-live-value {
+        color: var(--cp-e7eaee);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        min-width: 62px;
+        white-space: nowrap;
+    }
+
+    .stack-live-spark {
+        --spark-height: 22px;
+        width: 76px;
+    }
+
+    .cpu {
+        color: var(--stat-cpu);
+    }
+
+    .mem {
+        color: var(--stat-mem);
+    }
+}
+
+@media (max-width: 576px) {
+    .section-heading:has(.stack-live-stats) {
+        flex-wrap: wrap;
+        row-gap: 4px;
+    }
+
+    .stack-live-stats {
+        gap: 14px;
+        margin-left: 0;
+    }
+
+    .stack-live-stat .stack-live-spark {
+        display: none;
+    }
+
+    .stack-live-stat .stack-live-value {
+        min-width: 0;
+    }
 }
 
 .services-section > .input-group,

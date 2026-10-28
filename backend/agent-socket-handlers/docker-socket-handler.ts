@@ -295,6 +295,7 @@ export class DockerSocketHandler extends AgentSocketHandler {
                 callbackResult({
                     ok: true,
                     dockerStats,
+                    dockerHost: await server.dockerStatsMonitor.getHostInfo(),
                 }, callback);
             } catch (e) {
                 callbackError(e, callback);

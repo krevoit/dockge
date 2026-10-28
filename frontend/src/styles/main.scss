@@ -762,3 +762,21 @@ code {
 .cm-editor [contenteditable="true"] {
     background-color: transparent !important;
 }
+
+// Live stats colours (stack page meters and sparklines)
+:root,
+.light {
+    --stat-cpu: #2f6fc4;
+    --stat-mem: #1f8a55;
+    --stat-track: #e6e9ed;
+    --stat-warn: #b26a00;
+    --stat-danger: #c4323f;
+}
+
+.dark {
+    --stat-cpu: #6ea8fe;
+    --stat-mem: #5cdd8b;
+    --stat-track: #232830;
+    --stat-warn: #f0b44a;
+    --stat-danger: #f06572;
+}

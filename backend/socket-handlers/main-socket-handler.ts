@@ -9,6 +9,7 @@ import { generatePasswordHash, needRehashPassword, shake256, SHAKE256_LENGTH, ve
 import { User } from "../models/user";
 import {
     callbackError,
+    callbackResult,
     checkLogin,
     DockgeSocket,
     doubleCheckPassword,
@@ -18,6 +19,7 @@ import {
 import { passwordStrength } from "check-password-strength";
 import jwt from "jsonwebtoken";
 import { Settings } from "../settings";
+import { normalizeCooldownMinutes, normalizeWebhookFormat, validateWebhookUrl } from "../notification";
 import fs, { promises as fsAsync } from "fs";
 import path from "path";
 import childProcessAsync from "promisify-child-process";
@@ -360,8 +362,21 @@ export class MainSocketHandler extends SocketHandler {
                 }
                 delete data.globalENV;
 
+                // Notification settings
+                if (typeof data.notificationWebhookUrl === "string" && data.notificationWebhookUrl.trim()) {
+                    data.notificationWebhookUrl = validateWebhookUrl(data.notificationWebhookUrl);
+                } else {
+                    data.notificationWebhookUrl = "";
+                }
+                data.notificationWebhookFormat = normalizeWebhookFormat(data.notificationWebhookFormat);
+                data.notificationCooldownMinutes = normalizeCooldownMinutes(data.notificationCooldownMinutes);
+                for (const key of [ "notifyImageUpdates", "notifyContainerCrash", "notifyContainerUnhealthy" ]) {
+                    data[key] = data[key] === true;
+                }
+
                 await Settings.setSettings("general", data);
                 await server.startStackUpdateCheckScheduler();
+                await server.notificationManager.refresh();
 
                 callback({
                     ok: true,
@@ -377,6 +392,19 @@ export class MainSocketHandler extends SocketHandler {
                         msg: e.message,
                     });
                 }
+            }
+        });
+
+        socket.on("sendTestNotification", async (url : unknown, format : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                await server.notificationManager.sendTest(url, format);
+                callbackResult({
+                    ok: true,
+                    msg: "Test notification sent",
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
             }
         });
 
