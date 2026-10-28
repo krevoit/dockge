@@ -1,5 +1,6 @@
 import childProcessAsync from "promisify-child-process";
 import { log } from "./log";
+import { getRemoteDigest } from "./registry-client";
 
 export class ImageRepository {
     private imageInfos: Map<string, Map<string, ImageInfo>> = new Map();
@@ -12,12 +13,7 @@ export class ImageRepository {
         let imageInfo = await this.updateLocal(stack, service, image);
 
         if (imageInfo.localDigest && !image.startsWith("sha256:")) {
-            const resRemote = await childProcessAsync.spawn("skopeo", [ "inspect", "--no-tags", "--format", "{{ .Digest }}", "docker://" + image ], {
-                encoding: "utf-8",
-                timeout: 45 * 1000,
-            });
-
-            const remoteDigest = resRemote.stdout?.toString().trim() || "";
+            const remoteDigest = await getRemoteDigest(image);
             imageInfo = new ImageInfo(remoteDigest, imageInfo.localDigest, imageInfo.localId);
             this.updateInfo(stack, service, image, imageInfo);
         }

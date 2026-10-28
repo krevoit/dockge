@@ -449,7 +449,7 @@ export class Stack {
 
         if (refreshUpdateInfo) {
             // Registry checks are intentionally sequential to avoid rate limits and
-            // large bursts of Docker/skopeo processes on hosts with many stacks.
+            // large bursts of Docker processes and registry requests on hosts with many stacks.
             for (const stack of stackList.values()) {
                 await stack.refreshUpdateInfo(forceUpdateInfo);
             }
