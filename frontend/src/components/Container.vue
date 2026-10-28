@@ -115,43 +115,44 @@
              Works on jsonConfig.services[name] via ArrayInput/ArraySelect. -->
         <transition name="slide-fade" appear>
             <div v-if="isEditMode && showConfig" class="config mt-3">
-                <div class="mb-4">
+                <div>
                     <label class="form-label">{{ $t("dockerImage") }}</label>
                     <input v-model="service.image" class="form-control" list="image-datalist" placeholder="nginx:latest" />
                     <datalist id="image-datalist">
                         <option value="louislam/uptime-kuma:1" />
                     </datalist>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">{{ $t("port", 2) }}</label>
-                    <ArrayInput name="ports" :display-name="$t('port')" placeholder="HOST:CONTAINER" />
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">{{ $t("volume", 2) }}</label>
-                    <ArrayInput name="volumes" :display-name="$t('volume')" placeholder="HOST:CONTAINER" />
-                </div>
-                <div class="mb-4">
+                <div>
                     <label class="form-label">{{ $t("restartPolicy") }}</label>
-                    <select v-model="service.restart" class="form-select">
+                    <select v-model="restartPolicy" class="form-select">
+                        <option value="">{{ $t("restartPolicyNotSet") }}</option>
                         <option value="always">{{ $t("restartPolicyAlways") }}</option>
                         <option value="unless-stopped">{{ $t("restartPolicyUnlessStopped") }}</option>
                         <option value="on-failure">{{ $t("restartPolicyOnFailure") }}</option>
                         <option value="no">{{ $t("restartPolicyNo") }}</option>
                     </select>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">{{ $t("environmentVariable", 2) }}</label>
-                    <ArrayInput name="environment" :display-name="$t('environmentVariable')" placeholder="KEY=VALUE" />
+                <div>
+                    <label class="form-label">{{ $t("port", 2) }}</label>
+                    <ArrayInput name="ports" :display-name="$t('port')" placeholder="HOST:CONTAINER" />
                 </div>
-                <div class="mb-4">
+                <div>
+                    <label class="form-label">{{ $t("volume", 2) }}</label>
+                    <ArrayInput name="volumes" :display-name="$t('volume')" placeholder="HOST:CONTAINER" />
+                </div>
+                <div class="span-2">
+                    <label class="form-label">{{ $t("environmentVariable", 2) }}</label>
+                    <ArrayInput name="environment" :display-name="$t('environmentVariable')" placeholder="KEY=VALUE" allow-map />
+                </div>
+                <div>
                     <label class="form-label">{{ $t("network", 2) }}</label>
                     <div v-if="networkList.length === 0 && service.networks && service.networks.length > 0" class="text-warning mb-3">
                         {{ $t("NoNetworksAvailable") }}
                     </div>
                     <ArraySelect name="networks" :display-name="$t('network')" placeholder="Network Name" :options="networkList" />
-                    <div class="form-text">Manage stack networks in the Networks section below. External host networks can be attached there.</div>
+                    <div class="form-text">{{ $t("serviceNetworksHelp") }}</div>
                 </div>
-                <div class="mb-4">
+                <div>
                     <label class="form-label">{{ $t("dependsOn") }}</label>
                     <ArrayInput name="depends_on" :display-name="$t('dependsOn')" :placeholder="$t('containerName')" />
                 </div>
@@ -391,6 +392,18 @@ export default defineComponent({
         memTitle() {
             return this.$t("memStatTitle", { percent: this.memBarPercent.toFixed(1) });
         },
+        restartPolicy: {
+            get() {
+                return this.service.restart ?? "";
+            },
+            set(value) {
+                if (value) {
+                    this.service.restart = value;
+                } else {
+                    delete this.service.restart;
+                }
+            },
+        },
         statsInstances() {
             if (!this.serviceStatus) {
                 return [];
@@ -550,6 +563,29 @@ export default defineComponent({
         }
     }
 
+    .config {
+        border-top: 1px solid var(--ct-292e35);
+        display: grid;
+        gap: 16px 20px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding-top: 14px;
+
+        .span-2 {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            color: var(--ct-89919c);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .form-text {
+            font-size: 12px;
+        }
+    }
+
     .live-stats {
         align-items: end;
         border-top: 1px solid var(--ct-292e35);
@@ -646,6 +682,12 @@ export default defineComponent({
 
     .container .function,
     .container .action-group { justify-content: start; }
+}
+
+@media (max-width: 767px) {
+    .container .config {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 576px) {

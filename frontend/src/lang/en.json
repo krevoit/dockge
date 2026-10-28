@@ -95,7 +95,7 @@
     "Edit": "Edit",
     "applyToYAML": "Apply to YAML",
     "createExternalNetwork": "Create",
-    "addInternalNetwork": "Add",
+    "addInternalNetwork": "Add network",
     "Save": "Save",
     "Language": "Language",
     "Current User": "Current User",
@@ -261,8 +261,11 @@
     "oidcError_state_mismatch": "Sign-in must be finished in the same browser it was started in. Please try again.",
     "oidcError_expired": "The sign-in expired. Please try again.",
     "oidcError_provider_unavailable": "Could not reach the identity provider. Check OIDC_ISSUER_URL and the server logs.",
-    "oidcError_user_inactive": "The admin account has been deactivated.",
+    "oidcError_user_inactive": "The Dockge account has been deactivated.",
     "oidcError_rate_limited": "Too many sign-in attempts. Try again in a minute.",
     "oidcError_login_failed": "Single sign-on failed. Check the server logs for details.",
-    "oidcError_not_configured": "Single sign-on is not configured."
+    "oidcError_not_configured": "Single sign-on is not configured.",
+    "restartPolicyNotSet": "Not set (no restart)",
+    "serviceNetworksHelp": "Create stack networks and attach external ones under \"URLs & networks\" below.",
+    "editRawEnv": "Edit raw .env"
 }

@@ -88,7 +88,7 @@
 
                 <div class="mb-4">
                     <button v-if="settings.disableAuth" id="enableAuth-btn" class="btn btn-outline-primary me-2 mb-2" @click="enableAuth">{{ $t("Enable Auth") }}</button>
-                    <button v-if="! settings.disableAuth" id="disableAuth-btn" class="btn btn-primary me-2 mb-2" @click="confirmDisableAuth">{{ $t("Disable Auth") }}</button>
+                    <button v-if="! settings.disableAuth" id="disableAuth-btn" class="btn btn-outline-danger me-2 mb-2" @click="confirmDisableAuth">{{ $t("Disable Auth") }}</button>
                 </div>
             </div>
         </div>

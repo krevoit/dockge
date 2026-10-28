@@ -412,50 +412,76 @@ export default {
 
     .dropdown-menu {
         transition: all 0.2s;
-        padding-left: 0;
-        padding-bottom: 0;
+        padding: 4px 0;
         bottom: auto !important;
         left: auto !important;
         margin: 8px 0 0 !important;
-        min-width: 230px;
+        min-width: 220px;
         position: absolute !important;
         right: 0 !important;
         top: 100% !important;
         transform: none !important;
-        border-radius: 7px;
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(15, 20, 30, 0.12);
         overflow: hidden;
 
         .dropdown-divider {
-            margin: 0;
-            border-top: 1px solid rgba(0, 0, 0, 0.4);
+            margin: 4px 0;
+            border-top: 1px solid #e6e8eb;
             background-color: transparent;
         }
 
         .dropdown-item-text {
-            font-size: 14px;
-            padding-bottom: 0.7rem;
+            color: #6a7079;
+            display: block;
+            font-size: 12px;
+            padding: 8px 14px 6px;
+
+            strong {
+                color: #1d232b;
+                font-weight: 600;
+            }
         }
 
         .dropdown-item {
-            padding: 0.7rem 1rem;
+            align-items: center;
+            display: flex;
+            font-size: 13px;
+            gap: 10px;
+            padding: 7px 14px;
+
+            svg {
+                color: #8b9098;
+                flex: 0 0 14px;
+            }
+
+            &:hover {
+                background-color: #f1f3f5;
+            }
+
+            &.active {
+                background-color: rgba($primary, 0.12);
+                color: inherit;
+            }
         }
 
         .dark & {
             background-color: $dark-bg;
             color: $dark-font-color;
             border-color: $dark-border-color;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 
             .dropdown-item-text {
-                color: #dce3eb !important;
+                color: #9aa3ae;
 
                 strong {
-                    color: #ffffff;
-                    font-weight: 650;
+                    color: #f0f2f5;
                 }
             }
 
             .dropdown-divider {
-                border-top-color: #3a4350;
+                border-top-color: #2b2f36;
             }
 
             .dropdown-item {
@@ -463,7 +489,7 @@ export default {
 
                 &.active {
                     color: $dark-font-color2;
-                    background-color: $highlight !important;
+                    background-color: rgba($primary, 0.12) !important;
                 }
 
                 &:hover {

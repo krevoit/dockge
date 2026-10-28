@@ -568,8 +568,9 @@ export default {
     border-bottom: 1px solid #d9dce1;
     display: flex;
     justify-content: space-between;
-    margin: 0 -18px;
-    padding: 0 18px 12px;
+    // Extends to the edge of the main column; the page only has 10px padding on the right
+    margin: 0 -10px 0 -18px;
+    padding: 0 10px 12px 18px;
 
     h1 { margin: 0; }
 }

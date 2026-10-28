@@ -1,7 +1,7 @@
 <template>
     <div>
         <div v-if="valid">
-            <ul v-if="isArrayInited" class="list-group">
+            <ul v-if="isArrayInited && array.length > 0" class="list-group">
                 <li v-for="(value, index) in array" :key="index" class="list-group-item">
                     <select v-model="array[index]" class="no-bg domain-input">
                         <option value="">{{ $t(`Select a network...`) }}</option>
@@ -12,10 +12,11 @@
                 </li>
             </ul>
 
-            <button class="btn btn-normal btn-sm mt-3" @click="addField">{{ $t("addListItem", [ displayName ]) }}</button>
+            <button class="btn btn-normal btn-sm mt-2" @click="addField">{{ $t("addListItem", [ displayName ]) }}</button>
         </div>
-        <div v-else>
-            Long syntax is not supported here. Please use the YAML editor.
+        <div v-else class="form-text">
+            <font-awesome-icon icon="info-circle" class="me-1" />
+            {{ $t("LongSyntaxNotSupported") }}
         </div>
     </div>
 </template>
@@ -105,24 +106,37 @@ export default {
 @import "../styles/vars.scss";
 
 .list-group {
-    background-color: $dark-bg2;
-
     li {
         display: flex;
         align-items: center;
-        padding: 10px 0 10px 10px;
+        gap: 6px;
+        padding: 8px 0 8px 10px;
 
         .domain-input {
             flex-grow: 1;
-            background-color: $dark-bg2;
+            min-width: 0;
+            background-color: transparent;
             border: none;
-            color: $dark-font-color;
+            color: inherit;
+            font-size: 13px;
             outline: none;
 
             &::placeholder {
-                color: #1d2634;
+                color: #8b9098;
             }
         }
+    }
+}
+
+.dark .list-group {
+    background-color: $dark-bg2;
+
+    li .domain-input::placeholder {
+        color: #626871;
+    }
+
+    option {
+        background-color: $dark-bg2;
     }
 }
 </style>

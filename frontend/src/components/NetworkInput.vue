@@ -1,22 +1,22 @@
 <template>
     <div>
         <h5>{{ $t("Internal Networks") }}</h5>
-        <ul class="list-group">
+        <ul v-if="networkList.length > 0" class="list-group">
             <li v-for="(networkRow, index) in networkList" :key="index" class="list-group-item">
                 <input v-model="networkRow.key" type="text" class="no-bg domain-input" :placeholder="$t(`Network name...`)" />
                 <font-awesome-icon icon="times" class="action remove ms-2 me-3 text-danger" @click="remove(index)" />
             </li>
         </ul>
 
-        <button class="btn btn-normal btn-sm mt-3 me-2" @click="addField">{{ $t("addInternalNetwork") }}</button>
+        <button class="btn btn-normal btn-sm mt-2 me-2" @click="addField">{{ $t("addInternalNetwork") }}</button>
 
-        <h5 class="mt-3">{{ $t("External Networks") }}</h5>
+        <h5 class="mt-4">{{ $t("External Networks") }}</h5>
 
-        <div v-if="externalNetworkList.length === 0">
+        <div v-if="externalNetworkList.length === 0" class="form-text">
             {{ $t("No External Networks") }}
         </div>
 
-        <div v-for="(networkName, index) in externalNetworkList" :key="networkName" class="form-check form-switch my-3">
+        <div v-for="(networkName, index) in externalNetworkList" :key="networkName" class="form-check form-switch my-2">
             <input :id=" 'external-network' + index" v-model="selectedExternalList[networkName]" class="form-check-input" type="checkbox">
 
             <label class="form-check-label" :for=" 'external-network' +index">

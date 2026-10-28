@@ -179,13 +179,12 @@
                                 <span>URLs &amp; networks</span>
                             </div>
                         </div>
-                        <div class="shadow-box big-padding mb-3">
-                            <div class="mb-4">
-                                <label class="form-label">{{ $t("url", 2) }}</label>
+                        <div class="extras-grid">
+                            <div class="extras-panel">
+                                <h5>{{ $t("url", 2) }}</h5>
                                 <ArrayInput name="urls" :display-name="$t('url')" placeholder="https://" object-type="x-dockge" />
                             </div>
-                            <div>
-                                <label class="form-label">{{ $t("network", 2) }}</label>
+                            <div class="extras-panel">
                                 <NetworkInput />
                             </div>
                         </div>
@@ -341,7 +340,7 @@
                                         <span v-else>{{ entry.maskedValue }}</span>
                                     </div>
                                     <button v-if="isEditMode" v-b-modal.env-editor-modal class="raw-env-button" type="button">
-                                        <font-awesome-icon icon="expand" /> Edit raw .env
+                                        <font-awesome-icon icon="expand" class="me-1" />{{ $t("editRawEnv") }}
                                     </button>
                                 </div>
                             </div>
@@ -1613,6 +1612,33 @@ export default {
 .section-heading span {
     color: var(--cp-a8b4c3);
     font-size: 12px;
+}
+
+.extras-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 10px 12px 12px;
+}
+
+.extras-panel {
+    background: var(--ct-111318);
+    border: 1px solid var(--ct-292e35);
+    border-radius: 6px;
+    min-width: 0;
+    padding: 12px;
+
+    h5 {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+}
+
+@media (max-width: 767px) {
+    .extras-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .stack-live-stats {
