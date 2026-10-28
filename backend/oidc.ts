@@ -20,7 +20,8 @@ import { User } from "./models/user";
  *   OIDC_ALLOW_HTTP         true: allow a plain http issuer (testing only)
  *   DISABLE_PASSWORD_LOGIN  true: only single sign-on (ignored unless OIDC is configured correctly)
  *
- * Every successful sign-in logs in as the admin user, so who may sign in is decided by the provider
+ * Every successful sign-in logs in as the Dockge user (the account created at setup, whatever its name),
+ * so who may sign in is decided by the provider
  * (e.g. which users or groups are assigned to the client).
  */
 
@@ -267,7 +268,7 @@ export class OidcManager {
     }
 
     /**
-     * Finish a sign-in from the provider's redirect and return the admin user to log in as
+     * Finish a sign-in from the provider's redirect and return the Dockge user to log in as
      * @param callbackUrl The callback request URL (only its query string is used)
      * @param cookieState The state from the cookie set by startLogin
      */
@@ -301,31 +302,33 @@ export class OidcManager {
             throw new OidcLoginError("login_failed", "The provider did not return an ID token");
         }
 
-        const user = await this.getAdminUser();
+        const user = await this.getLoginUser(claims);
         log.info("auth", `${this.describe(claims)} signed in as ${user.username}`);
         return user;
     }
 
     /**
-     * The admin user every single sign-on logs in as. On a fresh install it is created here,
-     * since there is no setup page when password login is disabled.
+     * The Dockge user every single sign-on logs in as: the first active account, whatever its name.
+     * On a fresh install it is created here (named after the SSO identity), since there is no setup
+     * page when password login is disabled.
      */
-    protected async getAdminUser() : Promise<User> {
+    protected async getLoginUser(claims : Record<string, unknown>) : Promise<User> {
         const user = await R.findOne("user", " active = 1 ORDER BY id ") as User | null;
         if (user) {
             return user;
         }
         if (await R.findOne("user")) {
-            throw new OidcLoginError("user_inactive", "The admin user is deactivated");
+            throw new OidcLoginError("user_inactive", "The Dockge user is deactivated");
         }
 
-        const admin = R.dispense("user") as User;
-        admin.username = "admin";
+        const name = [ claims.preferred_username, claims.email ].find(v => typeof v === "string" && v.trim()) as string | undefined;
+        const created = R.dispense("user") as User;
+        created.username = name ? name.trim().slice(0, 100) : "admin";
         // Unusable random password; set one with `npm run reset-password` to use password login
-        admin.password = generatePasswordHash(crypto.randomBytes(32).toString("hex"));
-        await R.store(admin);
-        log.info("auth", "Created the admin user on the first single sign-on");
-        return admin;
+        created.password = generatePasswordHash(crypto.randomBytes(32).toString("hex"));
+        await R.store(created);
+        log.info("auth", `Created user ${created.username} on the first single sign-on`);
+        return created;
     }
 
     /**

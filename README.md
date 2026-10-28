@@ -167,7 +167,7 @@ A container stuck in a restart loop sends one alert, then one summary per cooldo
 
 ## Single Sign-On (OIDC)
 
-Dockge can sign in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). Every successful single sign-on logs in as the Dockge admin user. It is configured with environment variables:
+Dockge can sign in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). Every successful single sign-on logs in as the Dockge user (the account created at setup, whatever its name). It is configured with environment variables:
 
 | Variable | Description |
 |---|---|
@@ -181,8 +181,8 @@ Dockge can sign in with any OpenID Connect provider (Authentik, Authelia, Keyclo
 | `DISABLE_PASSWORD_LOGIN` | `true` turns off username + password login, so only single sign-on is possible |
 
 Notes:
-- **Anyone your provider lets sign in to this client becomes the Dockge admin**, which means full control over Docker on the host. Restrict the client to the right users or groups in your provider (for example an application binding in Authentik, or `authorization_policy` in Authelia).
-- `DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins. On a fresh install the first single sign-on creates the admin user, so there is no setup page.
+- **Anyone your provider lets sign in to this client gets into Dockge as that user**, which means full control over Docker on the host. Restrict the client to the right users or groups in your provider (for example an application binding in Authentik, or `authorization_policy` in Authelia).
+- `DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins. On a fresh install the first single sign-on creates the user (named after your SSO username), so there is no setup page.
 - A Dockge with password login disabled can't be added as a remote agent, because agents sign in with a username and password.
 
 ## Screenshots
