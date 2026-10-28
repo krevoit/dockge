@@ -141,7 +141,7 @@ export class MainSocketHandler extends SocketHandler {
                 await server.afterLogin(socket, user);
                 callback({
                     ok: true,
-                    token: User.createJWT(user, server.jwtSecret),
+                    token: User.createJWT(user, server.jwtSecret, true),
                 });
             } catch (e) {
                 log.error("auth", "Single sign-on code login failed: " + (e instanceof Error ? e.message : e));
@@ -202,7 +202,7 @@ export class MainSocketHandler extends SocketHandler {
                     }
 
                     // Once password login is disabled, sessions from earlier password logins end too
-                    if (!server.oidc.passwordLoginEnabled && !user.oidc_subject) {
+                    if (!server.oidc.passwordLoginEnabled && decoded.sso !== true) {
                         throw new Error("Password login is disabled");
                     }
 

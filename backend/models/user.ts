@@ -32,12 +32,14 @@ export class User extends BeanModel {
      * Create a new JWT for a user
      * @param {User} user The User to create a JsonWebToken for
      * @param {string} jwtSecret The key used to sign the JsonWebToken
+     * @param {boolean} sso Whether the session comes from single sign-on (still valid when password login is disabled)
      * @returns {string} the JsonWebToken as a string
      */
-    static createJWT(user : User, jwtSecret : string) {
+    static createJWT(user : User, jwtSecret : string, sso = false) {
         return jwt.sign({
             username: user.username,
             h: shake256(user.password, SHAKE256_LENGTH),
+            ...(sso ? { sso: true } : {}),
         }, jwtSecret, {
             // next-dev: bound token lifetime so a stolen localStorage token
             // is not a forever-admin. Password change still invalidates via `h`.

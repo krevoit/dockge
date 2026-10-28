@@ -1,18 +1,8 @@
-import { Knex } from "knex";
+// Superseded: single sign-on always logs in as the admin user, so users no longer need OIDC columns.
+// Kept so databases that already ran it don't report a missing migration; 2026-10-28-0400 removes the columns.
 
-export async function up(knex: Knex): Promise<void> {
-    // Users created by single sign-on are identified by issuer + subject, never by username
-    return knex.schema.alterTable("user", (table) => {
-        table.string("oidc_issuer", 255).nullable();
-        table.string("oidc_subject", 255).nullable();
-        table.unique([ "oidc_issuer", "oidc_subject" ]);
-    });
+export async function up() : Promise<void> {
 }
 
-export async function down(knex: Knex): Promise<void> {
-    return knex.schema.alterTable("user", (table) => {
-        table.dropUnique([ "oidc_issuer", "oidc_subject" ]);
-        table.dropColumn("oidc_issuer");
-        table.dropColumn("oidc_subject");
-    });
+export async function down() : Promise<void> {
 }

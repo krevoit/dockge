@@ -27,27 +27,16 @@ This fork adds several quality-of-life and operations-focused improvements on to
 - Network creation support for common drivers such as `bridge`, `macvlan`, `ipvlan`, and `overlay`, including subnet, gateway, parent interface, internal/attachable flags, and custom driver options.
 - Built-in Docker networks such as `bridge`, `host`, and `none` are protected from deletion.
 - Volume and image resource management with unused/dangling indicators to make cleanup safer and easier.
-- GitHub Actions workflow support for CI and GHCR image publishing, including local build steps for Dockge's base and healthcheck images.
+- GitHub Actions builds multi-arch images (amd64 + arm64) with `docker-bake.hcl` and smoke-tests both before tagging `latest`.
 
 # Available Architectures
 
-<table>
-  <thead>
-    <tr>
-      <th>Docker Tag</th>
-      <th>Architecture</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>pinned version #</td>
-      <td rowspan="2">amd64 / arm64 / armv7</td>
-    </tr>
-    <tr>
-      <td>latest</td>
-    </tr>
-  </tbody>
-</table>
+| Docker Tag | Architecture |
+|---|---|
+| `latest` (also `next-dev`) | amd64 / arm64 |
+| `<commit sha>` | amd64 / arm64 |
+
+Published as `krevoit/dockge` on Docker Hub and `ghcr.io/krevoit/dockge`. There is no 32-bit ARM (armv7) image because Node.js 24 has no official armv7 image.
 
 
 
@@ -178,28 +167,22 @@ A container stuck in a restart loop sends one alert, then one summary per cooldo
 
 ## Single Sign-On (OIDC)
 
-Dockge can sign users in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). It is configured with environment variables:
+Dockge can sign in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). Every successful single sign-on logs in as the Dockge admin user. It is configured with environment variables:
 
 | Variable | Description |
 |---|---|
-| `DOCKGE_OIDC_ISSUER_URL` | Issuer URL, e.g. `https://auth.example.com/application/o/dockge/` (required) |
-| `DOCKGE_OIDC_CLIENT_ID` | Client ID (required) |
-| `DOCKGE_OIDC_CLIENT_SECRET` | Client secret. Leave empty for a public client (PKCE is always used) |
-| `DOCKGE_OIDC_REDIRECT_URI` | Callback URL to register at the provider: `https://<your dockge>/auth/oidc/callback`. Recommended; derived from the request if not set |
-| `DOCKGE_OIDC_ALLOWED_GROUPS` | Comma-separated groups allowed to sign in |
-| `DOCKGE_OIDC_ALLOWED_EMAILS` | Comma-separated emails or whole domains (`@example.com`) allowed to sign in |
-| `DOCKGE_OIDC_ALLOW_ALL_USERS` | `true` lets everyone the provider authenticates sign in. Only use it when the provider already limits who can use this client |
-| `DOCKGE_OIDC_PROVIDER_NAME` | Button label, "Sign in with …" (default `SSO`) |
-| `DOCKGE_OIDC_SCOPES` | Default `openid profile email`. Add `groups` if your provider needs it for the groups claim |
-| `DOCKGE_OIDC_GROUPS_CLAIM` | Claim that holds the groups (default `groups`) |
-| `DOCKGE_OIDC_USERNAME_CLAIM` | Claim used for the Dockge username (default `preferred_username`) |
-| `DOCKGE_OIDC_TOKEN_AUTH_METHOD` | `client_secret_basic` (default) or `client_secret_post` |
-| `DOCKGE_DISABLE_PASSWORD_LOGIN` | `true` turns off username + password login, so only single sign-on is possible |
+| `OIDC_ISSUER_URL` | Issuer URL, e.g. `https://auth.example.com/application/o/dockge/` (required) |
+| `OIDC_CLIENT_ID` | Client ID (required) |
+| `OIDC_CLIENT_SECRET` | Client secret. Leave empty for a public client (PKCE is always used) |
+| `OIDC_REDIRECT_URI` | Callback URL to register at the provider: `https://<your dockge>/auth/oidc/callback`. Recommended; derived from the request if not set |
+| `OIDC_PROVIDER_NAME` | Button label, "Sign in with …" (default `SSO`) |
+| `OIDC_SCOPES` | Default `openid profile email` |
+| `OIDC_TOKEN_AUTH_METHOD` | `client_secret_basic` (default) or `client_secret_post` |
+| `DISABLE_PASSWORD_LOGIN` | `true` turns off username + password login, so only single sign-on is possible |
 
 Notes:
-- Signing in to Dockge gives full control over Docker on the host, so OIDC stays **disabled** unless `DOCKGE_OIDC_ALLOWED_GROUPS`, `DOCKGE_OIDC_ALLOWED_EMAILS` or `DOCKGE_OIDC_ALLOW_ALL_USERS` is set. Check the logs if the button doesn't appear.
-- `DOCKGE_DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins, and the first SSO login creates the first user (no setup page).
-- Each SSO identity gets its own Dockge user, matched by issuer and subject. A provider username that matches an existing user (e.g. `admin`) gets a different name instead of taking over that account.
+- **Anyone your provider lets sign in to this client becomes the Dockge admin**, which means full control over Docker on the host. Restrict the client to the right users or groups in your provider (for example an application binding in Authentik, or `authorization_policy` in Authelia).
+- `DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins. On a fresh install the first single sign-on creates the admin user, so there is no setup page.
 - A Dockge with password login disabled can't be added as a remote agent, because agents sign in with a username and password.
 
 ## Screenshots
@@ -240,13 +223,12 @@ services:
       #- TURNSTILE_SITE_KEY=0x4AAAAAAXXXXXXXX # uncomment this line to activate
       #- TURNSTILE_SECRET_KEY=0x4AAAAAAXXXX   # uncomment this line to activate
       # Single sign-on, see "Single Sign-On (OIDC)" above
-      #- DOCKGE_OIDC_ISSUER_URL=https://auth.example.com/application/o/dockge/
-      #- DOCKGE_OIDC_CLIENT_ID=dockge
-      #- DOCKGE_OIDC_CLIENT_SECRET=change-me
-      #- DOCKGE_OIDC_REDIRECT_URI=https://dockge.example.com/auth/oidc/callback
-      #- DOCKGE_OIDC_ALLOWED_GROUPS=dockge-admins
-      #- DOCKGE_OIDC_PROVIDER_NAME=Authentik
-      #- DOCKGE_DISABLE_PASSWORD_LOGIN=true
+      #- OIDC_ISSUER_URL=https://auth.example.com/application/o/dockge/
+      #- OIDC_CLIENT_ID=dockge
+      #- OIDC_CLIENT_SECRET=change-me
+      #- OIDC_REDIRECT_URI=https://dockge.example.com/auth/oidc/callback
+      #- OIDC_PROVIDER_NAME=Authentik
+      #- DISABLE_PASSWORD_LOGIN=true
     ports:
       # Host Port : Container Port
       - 5001:5001
