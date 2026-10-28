@@ -132,8 +132,8 @@ export default {
                 if (!this.settings.stackUpdateCheckIntervalHours) {
                     this.settings.stackUpdateCheckIntervalHours = 6;
                 }
-                if (!this.settings.notificationWebhookFormat) {
-                    this.settings.notificationWebhookFormat = "json";
+                if (!Array.isArray(this.settings.notificationChannels)) {
+                    this.settings.notificationChannels = [];
                 }
                 if (!this.settings.notificationCooldownMinutes) {
                     this.settings.notificationCooldownMinutes = 15;
@@ -166,7 +166,7 @@ export default {
                     this.loadSettings();
 
                     if (callback) {
-                        callback();
+                        callback(res);
                     }
                 });
             } else {
@@ -197,12 +197,6 @@ export default {
                 return {
                     success: false,
                     msg: this.$t("Invalid notification cooldown"),
-                };
-            }
-            if (this.settings.notificationWebhookUrl && !/^https?:\/\//i.test(this.settings.notificationWebhookUrl)) {
-                return {
-                    success: false,
-                    msg: this.$t("Webhook URL must start with http:// or https://"),
                 };
             }
             return {

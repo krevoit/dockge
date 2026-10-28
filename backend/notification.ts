@@ -3,9 +3,8 @@ import os from "node:os";
 import { log } from "./log";
 import { Settings } from "./settings";
 import { Stack } from "./stack";
-import { ValidationError } from "./util-server";
-
-export type WebhookFormat = "json" | "discord" | "slack";
+import { NotificationChannel } from "../common/notification-providers";
+import { sendToChannel, validateChannel } from "./notification-providers";
 
 export type NotificationEvent =
     "test" |
@@ -47,11 +46,6 @@ interface DockerEvent {
     };
 }
 
-interface WebhookConfig {
-    url: string;
-    format: WebhookFormat;
-}
-
 interface ContainerInfo {
     id: string;
     name: string;
@@ -81,35 +75,7 @@ const KILL_GRACE_MS = 2 * 60 * 1000;
 const LOOP_WINDOW_MS = 10 * 60 * 1000;
 const LOOP_THRESHOLD = 3;
 
-const WEBHOOK_TIMEOUT_MS = 10 * 1000;
 const FAILURE_LOG_INTERVAL_MS = 5 * 60 * 1000;
-
-const DISCORD_COLORS: Record<NotificationSeverity, number> = {
-    info: 0x5cdd8b,
-    success: 0x5cdd8b,
-    warning: 0xf8a306,
-    error: 0xdc3545,
-};
-
-export function validateWebhookUrl(url : unknown) : string {
-    if (typeof url !== "string" || !url.trim()) {
-        throw new ValidationError("Webhook URL is required");
-    }
-    let parsed: URL;
-    try {
-        parsed = new URL(url.trim());
-    } catch {
-        throw new ValidationError("Invalid webhook URL");
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        throw new ValidationError("Webhook URL must start with http:// or https://");
-    }
-    return parsed.toString();
-}
-
-export function normalizeWebhookFormat(format : unknown) : WebhookFormat {
-    return format === "discord" || format === "slack" ? format : "json";
-}
 
 export function normalizeCooldownMinutes(minutes : unknown) : number {
     const value = Number(minutes);
@@ -119,99 +85,21 @@ export function normalizeCooldownMinutes(minutes : unknown) : number {
     return Math.min(value, MAX_COOLDOWN_MINUTES);
 }
 
-function truncate(text : string, max : number) : string {
-    return text.length > max ? text.slice(0, max - 1) + "…" : text;
-}
-
-export function buildWebhookBody(payload : NotificationPayload, format : WebhookFormat, host : string) : object {
-    const timestamp = new Date().toISOString();
-
-    if (format === "discord") {
-        return {
-            username: "Dockge",
-            embeds: [
-                {
-                    title: truncate(payload.title, 256),
-                    description: truncate(payload.message, 4000),
-                    color: DISCORD_COLORS[payload.severity],
-                    timestamp,
-                    footer: { text: truncate(host, 2000) },
-                },
-            ],
-        };
-    }
-
-    if (format === "slack") {
-        return {
-            text: truncate(`*${payload.title}*\n${payload.message}\n_${host}_`, 3900),
-        };
-    }
-
-    // Generic JSON. `text` makes it readable by Slack-compatible receivers (Mattermost, Rocket.Chat, ...)
-    return {
-        ...payload,
-        host,
-        timestamp,
-        text: `${payload.title}\n${payload.message}`,
-    };
-}
-
-function sleep(ms : number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * POST a notification. Retries once on network errors, 429 and 5xx; never more.
- */
-export async function postWebhook(config : WebhookConfig, payload : NotificationPayload, host : string) : Promise<void> {
-    const body = JSON.stringify(buildWebhookBody(payload, config.format, host));
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        let res: Response;
-        try {
-            res = await fetch(config.url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "User-Agent": "Dockge",
-                },
-                body,
-                signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
-            });
-        } catch (e) {
-            if (attempt === 2) {
-                throw new Error(`Webhook request failed: ${e instanceof Error ? e.message : e}`, { cause: e });
-            }
-            await sleep(3000);
-            continue;
-        }
-
-        if (res.ok) {
-            return;
-        }
-        if (attempt === 1 && (res.status === 429 || res.status >= 500)) {
-            await sleep(3000);
-            continue;
-        }
-        throw new Error(`Webhook returned HTTP ${res.status}`);
-    }
-}
-
 export class NotificationManager {
     protected sentTimes: number[] = [];
     protected droppedByRateLimit = 0;
     protected throttles = new Map<string, Throttle>();
     protected crashTimes = new Map<string, number[]>();
     protected unhealthySent = new Set<string>();
-    protected lastFailureLog = 0;
+    protected lastFailureLog = new Map<string, number>();
     protected eventMonitor = new ContainerEventMonitor(this);
 
     /**
      * Start or stop the docker events watcher to match the current settings
      */
     async refresh() {
-        const config = await this.getConfig();
-        const watchEvents = !!config && (await this.isEnabled("notifyContainerCrash") || await this.isEnabled("notifyContainerUnhealthy"));
+        const channels = await this.getChannels();
+        const watchEvents = channels.length > 0 && (await this.isEnabled("notifyContainerCrash") || await this.isEnabled("notifyContainerUnhealthy"));
         if (watchEvents) {
             this.eventMonitor.start();
         } else {
@@ -227,23 +115,50 @@ export class NotificationManager {
         this.throttles.clear();
     }
 
-    async sendTest(url : unknown, format : unknown) {
-        await postWebhook({
-            url: validateWebhookUrl(url),
-            format: normalizeWebhookFormat(format),
-        }, {
+    async sendTest(rawChannel : unknown) {
+        const channel = validateChannel(rawChannel);
+        await sendToChannel(channel, {
             event: "test",
             severity: "info",
             title: "Dockge test notification",
-            message: "Webhook notifications are working.",
+            message: `Notifications to ${channel.name} are working.`,
         }, await this.getHost());
+    }
+
+    /**
+     * Convert the single webhook setting from the first notification release into a channel
+     */
+    async migrateLegacySettings() {
+        const url = await Settings.get("notificationWebhookUrl");
+        if (typeof url !== "string" || !url.trim()) {
+            return;
+        }
+        const existing = await Settings.get("notificationChannels");
+        if (!Array.isArray(existing) || existing.length === 0) {
+            const format = await Settings.get("notificationWebhookFormat");
+            const type = format === "discord" ? "discord" : format === "slack" ? "mattermost" : "webhook";
+            const config = type === "webhook" ? { url } : { webhookUrl: url };
+            try {
+                const channel = validateChannel({
+                    type,
+                    name: "Webhook",
+                    enabled: true,
+                    config,
+                });
+                await Settings.set("notificationChannels", [ channel ], "general");
+                log.info("notification", `Moved the webhook setting to a ${type} notification channel`);
+            } catch (e) {
+                log.warn("notification", `Could not migrate the webhook setting: ${e instanceof Error ? e.message : e}`);
+            }
+        }
+        await Settings.set("notificationWebhookUrl", "", "general");
     }
 
     /**
      * Notify about image updates that have not been notified yet (per stack/service and remote digest)
      */
     async notifyImageUpdates(stacks : Iterable<Stack>) {
-        if (!await this.isEnabled("notifyImageUpdates") || !await this.getConfig()) {
+        if (!await this.isEnabled("notifyImageUpdates") || (await this.getChannels()).length === 0) {
             return;
         }
 
@@ -432,8 +347,8 @@ export class NotificationManager {
      * Send through the global rate limit. Never throws: delivery failures are logged (throttled).
      */
     protected async deliver(payload : NotificationPayload) {
-        const config = await this.getConfig();
-        if (!config) {
+        const channels = await this.getChannels();
+        if (channels.length === 0) {
             return;
         }
 
@@ -456,30 +371,42 @@ export class NotificationManager {
             this.droppedByRateLimit = 0;
         }
 
-        try {
-            await postWebhook(config, payload, await this.getHost());
-            log.debug("notification", `Sent ${payload.event}: ${payload.title}`);
-        } catch (e) {
-            if (now - this.lastFailureLog > FAILURE_LOG_INTERVAL_MS) {
-                this.lastFailureLog = now;
-                log.warn("notification", `Failed to send notification: ${e instanceof Error ? e.message : e}`);
+        const host = await this.getHost();
+        await Promise.all(channels.map(async (channel) => {
+            try {
+                await sendToChannel(channel, payload, host);
+                log.debug("notification", `Sent ${payload.event} to ${channel.name}: ${payload.title}`);
+            } catch (e) {
+                // Log each failing channel at most every few minutes
+                const lastLog = this.lastFailureLog.get(channel.id) ?? 0;
+                if (now - lastLog > FAILURE_LOG_INTERVAL_MS) {
+                    this.lastFailureLog.set(channel.id, now);
+                    log.warn("notification", `Failed to send to ${channel.name}: ${e instanceof Error ? e.message : e}`);
+                }
             }
-        }
+        }));
     }
 
-    protected async getConfig() : Promise<WebhookConfig | undefined> {
-        const url = await Settings.get("notificationWebhookUrl");
-        if (typeof url !== "string" || !url.trim()) {
-            return undefined;
+    /**
+     * Enabled, valid channels from the settings
+     */
+    protected async getChannels() : Promise<NotificationChannel[]> {
+        const raw = await Settings.get("notificationChannels");
+        if (!Array.isArray(raw)) {
+            return [];
         }
-        try {
-            return {
-                url: validateWebhookUrl(url),
-                format: normalizeWebhookFormat(await Settings.get("notificationWebhookFormat")),
-            };
-        } catch {
-            return undefined;
+        const channels : NotificationChannel[] = [];
+        for (const item of raw) {
+            try {
+                const channel = validateChannel(item);
+                if (channel.enabled) {
+                    channels.push(channel);
+                }
+            } catch (e) {
+                log.debug("notification", `Skipping invalid channel: ${e instanceof Error ? e.message : e}`);
+            }
         }
+        return channels;
     }
 
     protected async isEnabled(key : string) : Promise<boolean> {
