@@ -8,8 +8,10 @@
                     <button v-if="! settings.disableAuth" id="logout-btn" class="btn btn-danger ms-4 me-2 mb-2" @click="$root.logout">{{ $t("Logout") }}</button>
                 </p>
 
-                <h5 class="my-4 settings-subheading">{{ $t("Change Password") }}</h5>
-                <form class="mb-3" @submit.prevent="savePassword">
+                <p v-if="$root.info.passwordLogin === false" class="form-text">{{ $t("passwordLoginDisabledInfo") }}</p>
+
+                <h5 v-if="$root.info.passwordLogin !== false" class="my-4 settings-subheading">{{ $t("Change Password") }}</h5>
+                <form v-if="$root.info.passwordLogin !== false" class="mb-3" @submit.prevent="savePassword">
                     <div class="mb-3">
                         <label for="current-password" class="form-label">
                             {{ $t("Current Password") }}

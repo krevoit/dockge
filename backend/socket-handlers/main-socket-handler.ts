@@ -19,7 +19,8 @@ import {
 import { passwordStrength } from "check-password-strength";
 import jwt from "jsonwebtoken";
 import { Settings } from "../settings";
-import { normalizeCooldownMinutes, normalizeWebhookFormat, validateWebhookUrl } from "../notification";
+import { normalizeCooldownMinutes } from "../notification";
+import { validateChannels } from "../notification-providers";
 import fs, { promises as fsAsync } from "fs";
 import path from "path";
 import childProcessAsync from "promisify-child-process";
@@ -67,6 +68,10 @@ export class MainSocketHandler extends SocketHandler {
         // Setup
         socket.on("setup", async (username, password, callback) => {
             try {
+                if (!server.oidc.passwordLoginEnabled) {
+                    throw new Error("Password login is disabled. Sign in with single sign-on instead.");
+                }
+
                 if (passwordStrength(password).value === "Too weak") {
                     throw new Error("Password is too weak. It should contain alphabetic and numeric characters. It must be at least 6 characters in length.");
                 }
@@ -95,6 +100,52 @@ export class MainSocketHandler extends SocketHandler {
                         msg: e.message,
                     });
                 }
+            }
+        });
+
+        // Which login methods the login page should offer
+        socket.on("getAuthOptions", async (callback) => {
+            if (typeof callback !== "function") {
+                return;
+            }
+            callback({
+                ok: true,
+                passwordLogin: server.oidc.passwordLoginEnabled,
+                oidc: server.oidc.enabled ? { name: server.oidc.providerName } : null,
+            });
+        });
+
+        // Exchange the single-use code from the single sign-on redirect for a session token
+        socket.on("loginByOidcCode", async (code, callback) => {
+            try {
+                if (typeof callback !== "function") {
+                    return;
+                }
+                const clientIP = await server.getClientIP(socket);
+                if (!await loginRateLimiter.pass(callback)) {
+                    return;
+                }
+
+                const userId = server.oidc.redeemLoginCode(code);
+                const user = userId === undefined ? null : await R.findOne("user", " id = ? AND active = 1 ", [ userId ]) as User | null;
+                if (!user) {
+                    log.warn("auth", `Invalid or expired single sign-on code. IP=${clientIP}`);
+                    callback({
+                        ok: false,
+                        msg: "oidcError_expired",
+                        msgi18n: true,
+                    });
+                    return;
+                }
+
+                await server.afterLogin(socket, user);
+                callback({
+                    ok: true,
+                    token: User.createJWT(user, server.jwtSecret),
+                });
+            } catch (e) {
+                log.error("auth", "Single sign-on code login failed: " + (e instanceof Error ? e.message : e));
+                callbackError(e, callback);
             }
         });
 
@@ -150,6 +201,11 @@ export class MainSocketHandler extends SocketHandler {
                         throw new Error("The token is invalid due to password change or old token");
                     }
 
+                    // Once password login is disabled, sessions from earlier password logins end too
+                    if (!server.oidc.passwordLoginEnabled && !user.oidc_subject) {
+                        throw new Error("Password login is disabled");
+                    }
+
                     log.debug("auth", "afterLogin");
                     await server.afterLogin(socket, user);
                     log.debug("auth", "afterLogin ok");
@@ -201,6 +257,15 @@ export class MainSocketHandler extends SocketHandler {
 
                 if (!data || typeof data !== "object") {
                     return;
+                }
+
+                if (!server.oidc.passwordLoginEnabled) {
+                    log.info("auth", `Rejected password login because password login is disabled. IP=${clientIP}`);
+                    return callback({
+                        ok: false,
+                        msg: "passwordLoginDisabled",
+                        msgi18n: true,
+                    });
                 }
 
                 // Login Rate Limit (global bucket) + 2FA bucket so token
@@ -363,12 +428,9 @@ export class MainSocketHandler extends SocketHandler {
                 delete data.globalENV;
 
                 // Notification settings
-                if (typeof data.notificationWebhookUrl === "string" && data.notificationWebhookUrl.trim()) {
-                    data.notificationWebhookUrl = validateWebhookUrl(data.notificationWebhookUrl);
-                } else {
-                    data.notificationWebhookUrl = "";
-                }
-                data.notificationWebhookFormat = normalizeWebhookFormat(data.notificationWebhookFormat);
+                data.notificationChannels = validateChannels(data.notificationChannels);
+                delete data.notificationWebhookUrl;
+                delete data.notificationWebhookFormat;
                 data.notificationCooldownMinutes = normalizeCooldownMinutes(data.notificationCooldownMinutes);
                 for (const key of [ "notifyImageUpdates", "notifyContainerCrash", "notifyContainerUnhealthy" ]) {
                     data[key] = data[key] === true;
@@ -395,10 +457,10 @@ export class MainSocketHandler extends SocketHandler {
             }
         });
 
-        socket.on("sendTestNotification", async (url : unknown, format : unknown, callback) => {
+        socket.on("sendTestNotification", async (channel : unknown, callback) => {
             try {
                 checkLogin(socket);
-                await server.notificationManager.sendTest(url, format);
+                await server.notificationManager.sendTest(channel);
                 callbackResult({
                     ok: true,
                     msg: "Test notification sent",

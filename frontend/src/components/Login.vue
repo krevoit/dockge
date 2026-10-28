@@ -1,15 +1,28 @@
 <template>
     <div class="form-container">
         <div class="form">
-            <form @submit.prevent="submit">
+            <form v-if="authOptions" @submit.prevent="submit">
                 <h1 class="h3 mb-3 fw-normal" />
 
-                <div v-if="!tokenRequired" class="form-floating">
+                <template v-if="authOptions.oidc && !tokenRequired">
+                    <a
+                        class="w-100 btn sso-button"
+                        :class="authOptions.passwordLogin ? 'btn-outline-primary' : 'btn-primary'"
+                        href="/auth/oidc/login"
+                        @click="redirecting = true"
+                    >
+                        <font-awesome-icon :icon="redirecting ? 'spinner' : 'sign-out-alt'" :spin="redirecting" class="me-2" />
+                        {{ $t("signInWith", { name: authOptions.oidc.name }) }}
+                    </a>
+                    <div v-if="authOptions.passwordLogin" class="login-divider my-3">{{ $t("or") }}</div>
+                </template>
+
+                <div v-if="!tokenRequired && authOptions.passwordLogin" class="form-floating">
                     <input id="floatingInput" v-model="username" type="text" class="form-control" placeholder="Username" autocomplete="username" required>
                     <label for="floatingInput">{{ $t("Username") }}</label>
                 </div>
 
-                <div v-if="!tokenRequired" class="form-floating mt-3">
+                <div v-if="!tokenRequired && authOptions.passwordLogin" class="form-floating mt-3">
                     <input id="floatingPassword" v-model="password" type="password" class="form-control" placeholder="Password" autocomplete="current-password" required>
                     <label for="floatingPassword">{{ $t("Password") }}</label>
                 </div>
@@ -30,14 +43,14 @@
                         </label>
                     </div>
                 </div>
-                <div v-if="siteKey" id="turnstile-widget" ref="turnstile" class="mt-3 mb-3"></div>
+                <div v-if="siteKey && authOptions.passwordLogin" id="turnstile-widget" ref="turnstile" class="mt-3 mb-3"></div>
 
-                <button class="w-100 btn btn-primary" type="submit" :disabled="processing">
+                <button v-if="authOptions.passwordLogin" class="w-100 btn btn-primary" type="submit" :disabled="processing">
                     {{ $t("Login") }}
                 </button>
 
-                <div v-if="res && !res.ok" class="alert alert-danger mt-3" role="alert">
-                    {{ $t(res.msg) }}
+                <div v-if="error" class="alert alert-danger mt-3" role="alert">
+                    {{ $t(error) }}
                 </div>
             </form>
         </div>
@@ -45,6 +58,8 @@
 </template>
 
 <script>
+import { consumeHashParam } from "../util-frontend";
+
 export default {
     data() {
         return {
@@ -56,10 +71,43 @@ export default {
             tokenRequired: false,
             captchaToken: "",
             siteKey: "",
+            authOptions: null,
+            redirecting: false,
         };
     },
 
+    computed: {
+        error() {
+            if (this.res && !this.res.ok) {
+                return this.res.msg;
+            }
+            return this.$root.loginError;
+        },
+    },
+
     mounted() {
+        const oidcError = consumeHashParam("oidc_error");
+        if (oidcError) {
+            this.res = {
+                ok: false,
+                msg: "oidcError_" + oidcError.replace(/[^a-z_]/g, ""),
+            };
+        }
+
+        // Older servers don't answer; assume password login only
+        const fallback = setTimeout(() => {
+            this.authOptions ??= {
+                passwordLogin: true,
+                oidc: null,
+            };
+        }, 3000);
+        this.$root.getSocket().emit("getAuthOptions", (res) => {
+            clearTimeout(fallback);
+            this.authOptions = res?.ok ? res : {
+                passwordLogin: true,
+                oidc: null,
+            };
+        });
 
         this.getTurnstileSiteKey();
         document.title += " - Login";
@@ -174,6 +222,33 @@ export default {
 
     > .form-control {
         padding-left: 1.3rem;
+
+        // The floating label replaces the placeholder (a global placeholder colour made both show)
+        &::placeholder {
+            color: transparent !important;
+        }
+    }
+}
+
+.sso-button {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+}
+
+.login-divider {
+    align-items: center;
+    color: #8b949e;
+    display: flex;
+    font-size: 0.85rem;
+    gap: 10px;
+
+    &::before,
+    &::after {
+        border-top: 1px solid currentColor;
+        content: "";
+        flex: 1;
+        opacity: 0.35;
     }
 }
 

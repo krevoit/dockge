@@ -273,3 +273,16 @@ export function formatBytes(bytes : number) : string {
 export function formatPercent(value : number) : string {
     return `${value.toFixed(value < 10 ? 2 : 1)}%`;
 }
+
+/**
+ * Read a parameter from the URL fragment (e.g. #oidc_code=…) and remove the fragment if it was there
+ * @param name Parameter name
+ * @returns The value, or null
+ */
+export function consumeHashParam(name : string) : string | null {
+    const value = new URLSearchParams(location.hash.slice(1)).get(name);
+    if (value !== null) {
+        history.replaceState(history.state, "", location.pathname + location.search);
+    }
+    return value;
+}

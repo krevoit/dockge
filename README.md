@@ -165,6 +165,43 @@ cd /opt/dockge
 docker compose pull && docker compose up -d
 ```
 
+## Notifications
+
+Settings → Notifications sends alerts to one or more channels: **Discord, Telegram, ntfy, Gotify, Microsoft Teams, Mattermost, Apprise** (which reaches 100+ other services through an [Apprise API](https://github.com/caronc/apprise-api) server) and a generic **JSON webhook**. Each channel has a test button.
+
+Alerts:
+- **Image updates**: after each scheduled update check, once per new image version.
+- **Crashed or out-of-memory containers**: containers you stop, restart or remove (in Dockge or with `docker`) and containers that exit with code 0 are ignored.
+- **Unhealthy containers**, and when they recover.
+
+A container stuck in a restart loop sends one alert, then one summary per cooldown period (15 minutes by default) instead of an alert per crash. At most 30 notifications are sent per hour.
+
+## Single Sign-On (OIDC)
+
+Dockge can sign users in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). It is configured with environment variables:
+
+| Variable | Description |
+|---|---|
+| `DOCKGE_OIDC_ISSUER_URL` | Issuer URL, e.g. `https://auth.example.com/application/o/dockge/` (required) |
+| `DOCKGE_OIDC_CLIENT_ID` | Client ID (required) |
+| `DOCKGE_OIDC_CLIENT_SECRET` | Client secret. Leave empty for a public client (PKCE is always used) |
+| `DOCKGE_OIDC_REDIRECT_URI` | Callback URL to register at the provider: `https://<your dockge>/auth/oidc/callback`. Recommended; derived from the request if not set |
+| `DOCKGE_OIDC_ALLOWED_GROUPS` | Comma-separated groups allowed to sign in |
+| `DOCKGE_OIDC_ALLOWED_EMAILS` | Comma-separated emails or whole domains (`@example.com`) allowed to sign in |
+| `DOCKGE_OIDC_ALLOW_ALL_USERS` | `true` lets everyone the provider authenticates sign in. Only use it when the provider already limits who can use this client |
+| `DOCKGE_OIDC_PROVIDER_NAME` | Button label, "Sign in with …" (default `SSO`) |
+| `DOCKGE_OIDC_SCOPES` | Default `openid profile email`. Add `groups` if your provider needs it for the groups claim |
+| `DOCKGE_OIDC_GROUPS_CLAIM` | Claim that holds the groups (default `groups`) |
+| `DOCKGE_OIDC_USERNAME_CLAIM` | Claim used for the Dockge username (default `preferred_username`) |
+| `DOCKGE_OIDC_TOKEN_AUTH_METHOD` | `client_secret_basic` (default) or `client_secret_post` |
+| `DOCKGE_DISABLE_PASSWORD_LOGIN` | `true` turns off username + password login, so only single sign-on is possible |
+
+Notes:
+- Signing in to Dockge gives full control over Docker on the host, so OIDC stays **disabled** unless `DOCKGE_OIDC_ALLOWED_GROUPS`, `DOCKGE_OIDC_ALLOWED_EMAILS` or `DOCKGE_OIDC_ALLOW_ALL_USERS` is set. Check the logs if the button doesn't appear.
+- `DOCKGE_DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins, and the first SSO login creates the first user (no setup page).
+- Each SSO identity gets its own Dockge user, matched by issuer and subject. A provider username that matches an existing user (e.g. `admin`) gets a different name instead of taking over that account.
+- A Dockge with password login disabled can't be added as a remote agent, because agents sign in with a username and password.
+
 ## Screenshots
 
 <img width="3840" height="1039" alt="image" src="https://github.com/user-attachments/assets/6712e0ff-5853-4618-8d8e-7e06fb7375f4" />
@@ -202,6 +239,14 @@ services:
       #         to the internet for access.
       #- TURNSTILE_SITE_KEY=0x4AAAAAAXXXXXXXX # uncomment this line to activate
       #- TURNSTILE_SECRET_KEY=0x4AAAAAAXXXX   # uncomment this line to activate
+      # Single sign-on, see "Single Sign-On (OIDC)" above
+      #- DOCKGE_OIDC_ISSUER_URL=https://auth.example.com/application/o/dockge/
+      #- DOCKGE_OIDC_CLIENT_ID=dockge
+      #- DOCKGE_OIDC_CLIENT_SECRET=change-me
+      #- DOCKGE_OIDC_REDIRECT_URI=https://dockge.example.com/auth/oidc/callback
+      #- DOCKGE_OIDC_ALLOWED_GROUPS=dockge-admins
+      #- DOCKGE_OIDC_PROVIDER_NAME=Authentik
+      #- DOCKGE_DISABLE_PASSWORD_LOGIN=true
     ports:
       # Host Port : Container Port
       - 5001:5001

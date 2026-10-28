@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { MainRouter } from "./routers/main-router";
+import { OidcRouter } from "./routers/oidc-router";
+import { OidcManager } from "./oidc";
 import * as fs from "node:fs";
 import { PackageJson } from "type-fest";
 import { Database } from "./database";
@@ -53,6 +55,7 @@ export class DockgeServer {
      */
     routerList : Router[] = [
         new MainRouter(),
+        new OidcRouter(),
     ];
 
     /**
@@ -85,6 +88,7 @@ export class DockgeServer {
     stackUpdateCheckPromise? : Promise<void>;
     dockerStatsMonitor = new DockerStatsMonitor();
     notificationManager = new NotificationManager();
+    oidc = new OidcManager();
 
     /**
      *
@@ -409,7 +413,8 @@ export class DockgeServer {
         log.debug("server", "User count: " + userCount);
 
         // If there is no record in user table, it is a new Dockge instance, need to setup
-        if (userCount == 0) {
+        // With password login disabled, the first single sign-on login creates the first user instead
+        if (userCount == 0 && this.oidc.passwordLoginEnabled) {
             log.info("server", "No user, need setup");
             this.needSetup = true;
         }
@@ -433,9 +438,17 @@ export class DockgeServer {
             this.startStackUpdateCheckScheduler().catch((e) => {
                 log.error("stack-update-checker", e);
             });
-            this.notificationManager.refresh().catch((e) => {
-                log.error("notification", e);
-            });
+            if (this.oidc.enabled) {
+                // Surface a wrong issuer URL at startup instead of at the first login
+                this.oidc.getConfiguration().catch((e) => {
+                    log.error("auth", `OIDC discovery failed: ${e instanceof Error ? e.message : e}`);
+                });
+            }
+            this.notificationManager.migrateLegacySettings()
+                .then(() => this.notificationManager.refresh())
+                .catch((e) => {
+                    log.error("notification", e);
+                });
             checkVersion.startInterval();
         });
 
@@ -472,6 +485,8 @@ export class DockgeServer {
             latestVersion: latestVersionProperty,
             isContainer,
             primaryHostname: await Settings.get("primaryHostname"),
+            passwordLogin: this.oidc.passwordLoginEnabled,
+            oidc: this.oidc.enabled,
             //serverTimezone: await this.getTimezone(),
             //serverTimezoneOffset: this.getTimezoneOffset(),
         });

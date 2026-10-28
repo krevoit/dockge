@@ -4,6 +4,7 @@ import { defineComponent } from "vue";
 import jwtDecode from "jwt-decode";
 import { Terminal } from "@xterm/xterm";
 import { AgentSocket } from "../../../common/agent-socket";
+import { consumeHashParam } from "../util-frontend";
 
 let socket : Socket;
 
@@ -28,6 +29,7 @@ export default defineComponent({
             remember: (localStorage.remember !== "0"),
             loggedIn: false,
             allowLoginDialog: false,
+            loginError: null as string | null,
             username: null,
             composeTemplate: "",
 
@@ -185,8 +187,12 @@ export default defineComponent({
                 this.socketIO.connected = true;
                 this.socketIO.showReverseProxyGuide = false;
                 const token = this.storage().token;
+                // Coming back from single sign-on
+                const oidcCode = consumeHashParam("oidc_code");
 
-                if (token) {
+                if (oidcCode) {
+                    this.loginByOidcCode(oidcCode);
+                } else if (token) {
                     if (token !== "autoLogin") {
                         console.log("Logging in by token");
                         this.loginByToken(token);
@@ -366,6 +372,27 @@ export default defineComponent({
                 }
 
                 callback(res);
+            });
+        },
+
+        /**
+         * Exchange the single-use code from the single sign-on redirect for a session token
+         * @param {string} code Code from the URL fragment
+         * @returns {void}
+         */
+        loginByOidcCode(code : string) {
+            socket.emit("loginByOidcCode", code, (res) => {
+                this.allowLoginDialog = true;
+                if (res.ok) {
+                    this.loginError = null;
+                    this.storage().token = res.token;
+                    this.socketIO.token = res.token;
+                    this.loggedIn = true;
+                    this.username = this.getJWTPayload()?.username;
+                    this.afterLogin();
+                } else {
+                    this.loginError = res.msg;
+                }
             });
         },
 
