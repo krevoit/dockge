@@ -793,9 +793,11 @@ export class Stack {
             throw new Error("Failed to restart, please check the terminal output for more information.");
         }
 
-        exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "image", "prune", "--all", "--force" ], this.path);
-        if (exitCode !== 0) {
-            throw new Error("Failed to restart, please check the terminal output for more information.");
+        // Remove the images this update replaced: they are now untagged ("dangling"). Without --all,
+        // images of stopped stacks and images pulled or built by hand are kept.
+        const pruneExitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "image", "prune", "--force" ], this.path);
+        if (pruneExitCode !== 0) {
+            log.warn("update", `Stack ${this.name} was updated, but removing the old images failed`);
         }
 
         return exitCode;
