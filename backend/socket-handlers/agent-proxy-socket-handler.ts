@@ -37,6 +37,14 @@ export class AgentProxySocketHandler extends SocketHandler {
                 if (e instanceof Error) {
                     log.warn("agent", e.message);
                 }
+                // Answer the caller instead of leaving it waiting (e.g. an agent that is offline)
+                const callback = args[args.length - 1];
+                if (typeof callback === "function") {
+                    callback({
+                        ok: false,
+                        msg: e instanceof Error ? e.message : String(e),
+                    });
+                }
             }
         });
     }
