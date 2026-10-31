@@ -629,7 +629,6 @@ export class Stack {
             }
             options.splice(1, 0, "--env-file", "../global.env");
         }
-        console.log(options);
         return options;
     }
 

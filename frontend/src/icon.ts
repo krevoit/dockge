@@ -59,6 +59,15 @@ import {
     faChevronCircleRight,
     faChevronCircleDown,
     faExpand,
+    // file explorer
+    faFolder,
+    faFolderOpen,
+    faFileLines,
+    faDownload,
+    faArrowTurnUp,
+    faArrowLeft,
+    faAnglesDown,
+    faCube,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -118,6 +127,14 @@ library.add(
     faChevronCircleRight,
     faChevronCircleDown,
     faExpand,
+    faFolder,
+    faFolderOpen,
+    faFileLines,
+    faDownload,
+    faArrowTurnUp,
+    faArrowLeft,
+    faAnglesDown,
+    faCube,
 );
 
 export { FontAwesomeIcon };

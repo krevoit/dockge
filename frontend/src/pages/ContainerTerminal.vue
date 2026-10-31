@@ -6,6 +6,14 @@
             <div v-if="!isLogs" class="mb-3">
                 <router-link :to="sh" class="btn btn-normal me-2">{{ $t("Switch to sh") }}</router-link>
             </div>
+            <div v-else class="mb-3 d-flex flex-wrap gap-2">
+                <button class="btn btn-normal" type="button" @click="downloadLogs">
+                    <font-awesome-icon icon="download" class="me-1" />{{ $t("Download logs") }}
+                </button>
+                <router-link class="btn btn-normal" :to="filesLink">
+                    <font-awesome-icon icon="folder-open" class="me-1" />{{ $t("Browse files") }}
+                </router-link>
+            </div>
 
             <Terminal class="terminal" :rows="20" :mode="terminalMode" :name="terminalName" :stack-name="stackName" :service-name="serviceName" :shell="shell" :endpoint="endpoint"></Terminal>
         </div>
@@ -14,6 +22,8 @@
 
 <script>
 import { getContainerExecTerminalName, getContainerLogsTerminalName } from "../../../common/util-common";
+import { filesRoute } from "../util-frontend";
+import { startDownload } from "../downloads";
 
 export default {
     components: {
@@ -35,6 +45,9 @@ export default {
         },
         isLogs() {
             return this.$route.params.type === "logs";
+        },
+        filesLink() {
+            return filesRoute(this.stackName, this.endpoint, this.serviceName);
         },
         pageTitle() {
             return this.isLogs ? this.$t("logs") : this.$t("terminal");
@@ -75,7 +88,9 @@ export default {
 
     },
     methods: {
-
+        downloadLogs() {
+            startDownload(this.$root, this.endpoint, "openLogDownload", this.stackName, this.serviceName);
+        },
     }
 };
 </script>

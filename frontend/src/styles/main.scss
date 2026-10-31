@@ -780,3 +780,25 @@ code {
     --stat-warn: #f0b44a;
     --stat-danger: #f06572;
 }
+
+// File explorer
+:root,
+.light {
+    --fx-bg: #ffffff;
+    --fx-border: #e1e4e8;
+    --fx-muted: #6a7079;
+    --fx-row-hover: #f5f7f9;
+    --fx-selected: rgba(47, 111, 196, 0.1);
+    --fx-code-bg: #f7f8fa;
+    --fx-code-text: #1d232b;
+}
+
+.dark {
+    --fx-bg: #111318;
+    --fx-border: #2b2f36;
+    --fx-muted: #8b9098;
+    --fx-row-hover: #171a1f;
+    --fx-selected: rgba(110, 168, 254, 0.12);
+    --fx-code-bg: #0b0d10;
+    --fx-code-text: #d8dde3;
+}

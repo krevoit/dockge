@@ -286,3 +286,21 @@ export function consumeHashParam(name : string) : string | null {
     }
     return value;
 }
+
+/**
+ * Route to the file explorer of a stack, optionally opened on a service's container
+ * @param stackName Stack name
+ * @param endpoint Agent endpoint ("" for this server)
+ * @param service Service name, to browse its container
+ * @returns Route location
+ */
+export function filesRoute(stackName : string, endpoint : string, service? : string) {
+    return {
+        name: endpoint ? "filesEndpoint" : "files",
+        params: endpoint ? {
+            stackName,
+            endpoint,
+        } : { stackName },
+        query: service ? { service } : {},
+    };
+}

@@ -51,10 +51,19 @@
                         <span class="label">{{ $t("stopStack") }}</span>
                     </button>
 
+                    <router-link v-if="!isEditMode && !isAdd" class="btn btn-normal" :to="filesLink" :title="$t('Browse files')">
+                        <font-awesome-icon icon="folder-open" class="me-1" />
+                        <span class="label">{{ $t("Files") }}</span>
+                    </router-link>
+
                     <BDropdown right text="" variant="normal">
                         <BDropdownItem @click="downStack">
                             <font-awesome-icon icon="stop" class="me-1" />
                             <span class="label">{{ $t("downStack") }}</span>
+                        </BDropdownItem>
+                        <BDropdownItem v-if="!isAdd" @click="downloadLogs">
+                            <font-awesome-icon icon="download" class="me-1" />
+                            <span class="label">{{ $t("Download logs") }}</span>
                         </BDropdownItem>
                         <BDropdownItem v-if="!isEditMode && !errorDelete" @click="showDeleteDialog = !showDeleteDialog">
                             <font-awesome-icon icon="trash" class="me-1" /> {{ $t("deleteStack") }}
@@ -561,7 +570,8 @@ import { BModal } from "bootstrap-vue-next";
 import NetworkInput from "../components/NetworkInput.vue";
 import ArrayInput from "../components/ArrayInput.vue";
 import Sparkline from "../components/Sparkline.vue";
-import { formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
+import { filesRoute, formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
+import { startDownload } from "../downloads";
 import dotenv from "dotenv";
 import { ref } from "vue";
 
@@ -713,6 +723,10 @@ export default {
         };
     },
     computed: {
+        filesLink() {
+            return filesRoute(this.stack.name, this.endpoint);
+        },
+
         stackStats() {
             if (this.isAdd || this.isEditMode || this.stackStatsHistory.length === 0) {
                 return null;
@@ -1050,6 +1064,10 @@ export default {
 
         formatBytes,
         formatPercent,
+
+        downloadLogs() {
+            startDownload(this.$root, this.endpoint, "openLogDownload", this.stack.name, "");
+        },
 
         exitConfirm(next) {
             if (this.isEditMode) {

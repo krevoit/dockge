@@ -22,6 +22,8 @@ declare module 'vue' {
     Confirm: typeof import('./src/components/Confirm.vue')['default']
     Container: typeof import('./src/components/Container.vue')['default']
     DockerStat: typeof import('./src/components/DockerStat.vue')['default']
+    DownloadTray: typeof import('./src/components/DownloadTray.vue')['default']
+    FileViewer: typeof import('./src/components/FileViewer.vue')['default']
     General: typeof import('./src/components/settings/General.vue')['default']
     GlobalEnv: typeof import('./src/components/settings/GlobalEnv.vue')['default']
     HiddenInput: typeof import('./src/components/HiddenInput.vue')['default']

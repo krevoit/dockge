@@ -125,6 +125,7 @@
             </div>
 
             <router-view v-if="$root.loggedIn" />
+            <DownloadTray v-if="$root.loggedIn" />
             <Login v-if="! $root.loggedIn && $root.allowLoginDialog" />
         </main>
     </div>
@@ -132,6 +133,7 @@
 
 <script>
 import Login from "../components/Login.vue";
+import DownloadTray from "../components/DownloadTray.vue";
 import { compareVersions } from "compare-versions";
 import { ALL_ENDPOINTS } from "../../../common/util-common";
 
@@ -139,6 +141,7 @@ export default {
 
     components: {
         Login,
+        DownloadTray,
     },
 
     data() {

@@ -31,6 +31,10 @@
                         <font-awesome-icon icon="stream" />
                         {{ $t("logs") }}
                     </router-link>
+                    <router-link v-if="runtimeActions && (status === 'running' || status === 'healthy' || status === 'unhealthy')" class="btn btn-normal action-btn" :to="filesLink" :title="$t('Browse files')">
+                        <font-awesome-icon icon="folder-open" />
+                        {{ $t("Files") }}
+                    </router-link>
                     <button
                         v-if="runtimeActions && status !== 'running' && status !== 'healthy'"
                         class="btn btn-primary action-btn"
@@ -167,7 +171,7 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { parseDockerPort } from "../../../common/util-common";
 import DockerStat from "./DockerStat.vue";
 import Sparkline from "./Sparkline.vue";
-import { formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
+import { filesRoute, formatBytes, formatPercent, summarizeDockerStats } from "../util-frontend";
 import ArrayInput from "./ArrayInput.vue";
 import ArraySelect from "./ArraySelect.vue";
 
@@ -305,6 +309,10 @@ export default defineComponent({
 
         stackName() {
             return this.$parent.$parent.stack.name;
+        },
+
+        filesLink() {
+            return filesRoute(this.stackName, this.endpoint, this.name);
         },
 
         service() {
