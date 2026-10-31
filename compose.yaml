@@ -1,32 +1,38 @@
 services:
   dockge:
-    image: krevoit/dockge
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: krevoit/dockge:latest
+    container_name: dockge
     restart: unless-stopped
     ports:
-      # Host Port : Container Port
+      # Host port : container port
       - 5001:5001
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
-        
-      # If you want to use private registries, you need to share the auth file with Dockge:
-      # - /root/.docker/:/root/.docker
 
-      # Stacks Directory
-      # ⚠️ READ IT CAREFULLY. If you did it wrong, your data could end up writing into a WRONG PATH.
-      # ⚠️ 1. FULL path only. No relative path (MUST)
-      # ⚠️ 2. Left Stacks Path === Right Stacks Path (MUST)
+      # Stacks directory
+      # ⚠️ Use a FULL path, and the same path on both sides (and in DOCKGE_STACKS_DIR),
+      #    otherwise relative bind mounts in your stacks end up in the wrong place.
       - /opt/stacks:/opt/stacks
+
+      # Private registries: share your Docker credentials so Dockge can pull and check for updates
+      # - /root/.docker:/root/.docker:ro
     environment:
-      # Tell Dockge where is your stacks directory
+      # Where your stacks are (must match the volume above)
       - DOCKGE_STACKS_DIR=/opt/stacks
-      # Uncomment the following and enter valid Cloudflare Turnstile keys to activate CAPTCHA
-      # *NOTE*: Turnstile should only be enabled on the dockge instance you consider to be the
-      #         master if using remote agents, otherwise remote agents will not be able to
-      #         connect due to the CAPTCHA challenge and if you must, only expose the master
-      #         to the internet for access.
-      #- TURNSTILE_SITE_KEY=0x4AAAAAAXXXXXXXX 
-      #- TURNSTILE_SECRET_KEY=0x4AAAAAAXXXX
+
+      # Allow the host console (a shell on the Dockge container, which controls Docker)
+      # - DOCKGE_ENABLE_CONSOLE=true
+
+      # Single sign-on with OpenID Connect (see the README)
+      # - OIDC_ISSUER_URL=https://auth.example.com/application/o/dockge/
+      # - OIDC_CLIENT_ID=dockge
+      # - OIDC_CLIENT_SECRET=change-me
+      # - OIDC_REDIRECT_URI=https://dockge.example.com/auth/oidc/callback
+      # - OIDC_PROVIDER_NAME=Authentik
+      # - DISABLE_PASSWORD_LOGIN=true
+
+      # Cloudflare Turnstile CAPTCHA on the login page. Only enable it on the instance you log in to:
+      # remote agents can't solve the CAPTCHA.
+      # - TURNSTILE_SITE_KEY=0x4AAAAAAXXXXXXXX
+      # - TURNSTILE_SECRET_KEY=0x4AAAAAAXXXX

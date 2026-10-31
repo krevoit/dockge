@@ -1,259 +1,207 @@
-<div align="center" width="100%">
-    <img src="./frontend/public/icon.svg" width="128" alt="" />
+<div align="center">
+    <img src="./frontend/public/icon.svg" width="112" alt="" />
+    <h1>Dockge</h1>
+    <p>A fast, self-hosted manager for your Docker Compose stacks: edit, deploy, update and monitor them from the browser.</p>
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/krevoit/dockge?logo=docker)](https://hub.docker.com/r/krevoit/dockge/tags)
+[![Image size](https://img.shields.io/docker/image-size/krevoit/dockge/latest?logo=docker&label=image)](https://hub.docker.com/r/krevoit/dockge/tags)
+[![Last commit](https://img.shields.io/github/last-commit/krevoit/dockge/next-dev?logo=github)](https://github.com/krevoit/dockge/commits/next-dev/)
+[![License: MIT](https://img.shields.io/github/license/krevoit/dockge)](LICENSE)
+
 </div>
 
-# Dockge (forked by krevoit)
+![A stack in Dockge with live CPU and memory graphs for each container](docs/screenshots/stack.png)
 
-A fancy, easy-to-use and reactive self-hosted docker compose stack-oriented manager forked from louislam/dockge that has had several Pull Requests merged.
+Your stacks stay plain `compose.yaml` folders on disk. Dockge doesn't lock them into a database, so you can keep using `docker compose` (and git) next to it, and stacks started outside Dockge show up too.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/krevoit/dockge?logo=github&style=flat)](https://github.com/krevoit/dockge) [![Docker Pulls](https://img.shields.io/docker/pulls/krevoit/dockge?logo=docker)](https://hub.docker.com/r/krevoit/dockge/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/krevoit/dockge/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/krevoit/dockge/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/krevoit/dockge/next-dev?logo=github)](https://github.com/krevoit/dockge/commits/next-dev/)
+## Features
 
-<img width="3840" height="1937" alt="image" src="https://github.com/user-attachments/assets/3bb5aec8-e17a-43cb-8f15-908047282043" />
+**Stacks**
+- Create and edit `compose.yaml` and `.env` in a code editor, or with a form per service: image, ports, volumes, environment variables, networks, restart policy and dependencies.
+- Compose override files, and a global `.env` shared by every stack.
+- Paste a `docker run …` command and get a Compose service.
+- Deploy, start, stop, restart, update, take down and delete whole stacks or single services, with the output streamed live.
 
-View Video: https://youtu.be/AWAlOQeNpgU?t=48
+**Monitoring**
+- Live CPU and memory per container, with 2-minute graphs and stack totals.
+- Live combined logs per stack, logs per container, a shell in any container, and an optional console for running `docker` commands.
+- An overview of every running container's CPU, memory, network and disk I/O.
 
-# Enhancements in This Fork
+**Updates**
+- Checks your registries for new image versions on a schedule (every 6 hours by default) and marks the stacks and services that have one.
+- One-click update: pull, recreate, then remove the images the update replaced.
+- Private registries work through your mounted Docker credentials.
 
-This fork adds several quality-of-life and operations-focused improvements on top of the existing Dockge experience:
-*This is potentially unstable and NOT recommended for production use*
+**Files**
+- Browse a stack's folder (including bind mounts like `./config` and `./logs`) or the filesystem of a running container.
+- View logs (they open on the newest lines), follow them as they grow, and filter lines.
+- Download any file, or a container's logs, with a progress bar. [More](#file-explorer)
 
-- Stack update indicators in the main stack list, so stacks can show when container image updates appear to be available.
-- Per-container log views using `docker compose logs -f --tail 100 <container-name>`, available from each container card.
-- Enabled copy and paste in the web console and container terminals.
-- A new Resources page in the top navigation for managing Docker containers, networks, volumes, and images.
-- Resource safety filtering that hides Dockge's own container, image, and dedicated resources from destructive actions.
-- Container resource management with status, image, network, port, mount, isolated-state, and delete visibility.
-- Network resource management with internal/isolated/unused indicators, IPAM/options display, create-network controls, and connect/disconnect container membership actions.
-- Network creation support for common drivers such as `bridge`, `macvlan`, `ipvlan`, and `overlay`, including subnet, gateway, parent interface, internal/attachable flags, and custom driver options.
-- Built-in Docker networks such as `bridge`, `host`, and `none` are protected from deletion.
-- Volume and image resource management with unused/dangling indicators to make cleanup safer and easier.
-- GitHub Actions builds multi-arch images (amd64 + arm64) with `docker-bake.hcl` and smoke-tests both before tagging `latest`.
+**Notifications**
+- Discord, Telegram, ntfy, Gotify, Microsoft Teams, Mattermost, Apprise and JSON webhooks.
+- Image updates, crashed and out-of-memory containers, unhealthy containers and recoveries, with restart-loop protection. [More](#notifications)
 
-# Available Architectures
+**Docker resources**
+- Containers, networks, volumes and images in one place, with unused and dangling resources marked.
+- Create networks (bridge, macvlan, ipvlan, overlay, with subnet, gateway and driver options) and connect or disconnect containers.
+- Dockge's own container and Docker's built-in networks are protected from deletion.
 
-| Docker Tag | Architecture |
+**More**
+- Several Docker hosts in one interface through [remote agents](#remote-agents).
+- Single sign-on with OpenID Connect, optionally with password login turned off; Cloudflare Turnstile CAPTCHA; login rate limiting.
+- Dark and light themes, a mobile layout and ⌘K stack search.
+- Images for amd64 and arm64 (including Raspberry Pi with a 64-bit OS).
+
+## Screenshots
+
+| | |
 |---|---|
-| `latest` (also `next-dev`) | amd64 / arm64 |
-| `<commit sha>` | amd64 / arm64 |
+| ![Overview of all running containers](docs/screenshots/overview.png) | ![Editing a service with the form editor](docs/screenshots/editor.png) |
+| **Overview** of every running container | **Form editor**, here in the light theme |
+| ![Viewing a log file in the file explorer](docs/screenshots/files.png) | ![Notification channels in the settings](docs/screenshots/notifications.png) |
+| **File explorer** with a log open | **Notification channels** |
+| ![Docker resources page](docs/screenshots/resources.png) | ![Login page with a single sign-on button](docs/screenshots/login.png) |
+| **Docker resources** | **Single sign-on** |
 
-Published as `krevoit/dockge` on Docker Hub and `ghcr.io/krevoit/dockge`. There is no 32-bit ARM (armv7) image because Node.js 24 has no official armv7 image.
+<p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="A stack on a phone" /></p>
 
+## Install
 
+Requirements: Linux on amd64 or arm64 with [Docker Engine](https://docs.docker.com/engine/install/) and the Compose plugin.
 
-## ⭐ Features
-
-- 🧑‍💼 Manage your `compose.yaml` files
-  - Create/Edit/Start/Stop/Restart/Delete
-  - Update Docker Images
-- ⌨️ Interactive Editor for `compose.yaml`
-- 🦦 Interactive Web Terminal
-- 🕷️ (1.4.0+) Multiple agents support - You can manage multiple stacks from different Docker hosts in one single interface
-- 🏪 Convert `docker run ...` commands into `compose.yaml`
-- 📙 File based structure - Dockge won't kidnap your compose files, they are stored on your drive as usual. You can interact with them using normal `docker compose` commands
-
-<img src="https://github.com/louislam/dockge/assets/1336778/cc071864-592e-4909-b73a-343a57494002" width=300 />
-
-- 🚄 Reactive - Everything is just responsive. Progress (Pull/Up/Down) and terminal output are in real-time
-- 🐣 Easy-to-use & fancy UI - If you love Uptime Kuma's UI/UX, you will love this one too
-
-![](https://github.com/louislam/dockge/assets/1336778/89fc1023-b069-42c0-a01c-918c495f1a6a)
-
-## ⭐ Pull Requests Merged:
-- PR  #[23](https://github.com/louislam/dockge/pull/23) Compose override editor (by [eliasfloreteng](https://github.com/eliasfloreteng))
-- PR #[387](https://github.com/louislam/dockge/pull/387) Global.env editor and usage in docker operations (by [syko9000](https://github.com/syko9000))
-- PR #[414](https://github.com/louislam/dockge/pull/414) Set/Update Friendly Name (by [lohrbini](https://github.com/lohrbini))
-- PR #[575](https://github.com/louislam/dockge/pull/575) Theme Options Enabled in Settings (by [CampaniaGuy](https://github.com/CampaniaGuy))
-- PR #[582](https://github.com/louislam/dockge/pull/582) Remove logging of terminal buffer to console (by [black-dragon74](https://github.com/black-dragon74))
-- PR #[593](https://github.com/louislam/dockge/pull/593) Group stacks by its agent (by [ESPGranEdu](https://github.com/ESPGranEdu))
-- PR #[634](https://github.com/louislam/dockge/pull/634) Build Frontend During Docker Build (by [Jamie-](https://github.com/Jamie-))
-- PR #[637](https://github.com/louislam/dockge/pull/637) Implement RIGHT and LEFT KEYS terminal navigation (by [lukasondrejka](https://github.com/lukasondrejka))
-- PR #[649](https://github.com/louislam/dockge/pull/649) Add Container Control Buttons (by [mizady](https://github.com/mizady))
-- PR #[700](https://github.com/louislam/dockge/pull/700) Add Resource Usage Stats (by [justwiebe](https://github.com/justwiebe))
-- PR #[714](https://github.com/louislam/dockge/pull/714) Conditional stack files deletion (by [husa](https://github.com/husa))
-- PR #[724](https://github.com/louislam/dockge/pull/724) Adds force delete button when the delete option has failed (by [DomiiBunn](https://github.com/DomiiBunn))
-- PR #[730](https://github.com/louislam/dockge/pull/730) Add an Update All Button (by [DomiiBunn](https://github.com/DomiiBunn))
-- PR #[785](https://github.com/louislam/dockge/pull/785) Add Cloudflare Turnstile captcha (by [Kambaa](https://github.com/Kambaa))
-- PR #[786](https://github.com/louislam/dockge/pull/786) Replace editor with Codemirror (by [andersmmg](https://github.com/andersmmg))
-- PR #[800](https://github.com/louislam/dockge/pull/800) Improved stack list ui when using agents (by [maca134](https://github.com/maca134))
-    - with QOL Commit [ef7225a](https://github.com/louislam/dockge/commit/ef7225a333225d17d3fc92852226989973ec5aee) (by [Dracrius](https://github.com/Dracrius))
-- PR #[813](https://github.com/louislam/dockge/pull/813) Fix "Exited" Status when Expected (by [Aymendje](https://github.com/Aymendje))
-- PR #[822](https://github.com/louislam/dockge/pull/822) Add clipboard copy/paste support to terminal component (by [Dimariqe](https://github.com/Dimariqe))  
-	- be sure to allow the permission in the browser to take effect
-- PR #[827](https://github.com/louislam/dockge/pull/827) Fullscreen yaml editor (by [Joshua-Beatty](https://github.com/Joshua-Beatty))
-- PR #[834](https://github.com/louislam/dockge/pull/834) Add prune image on update process (by [MazziaRick](https://github.com/MazziaRick))
-- PR #[863](https://github.com/louislam/dockge/pull/863) Add Docker Images Management Feature (by [felix068](https://github.com/felix068))
-	- Currently under [feature/image-management](https://github.com/cmcooper1980/dockge/tree/feature/image-management) branch use docker tag `image-management`  
-	  to test
-- Commit [fc96f4e](https://github.com/louislam/dockge/commit/fc96f4edadcebe28eaf223c0a853261e908072a5) (by [Dracrius](https://github.com/Dracrius))
-	- switch to a button group and matched existing UI style (no more eye searing stop and restart buttons)
-	- Fixed message output to include a space after Service
-	- Added Processing prop and Start,Stop,Restart events
-- Commit [789f25a](https://github.com/louislam/dockge/commit/789f25a83c3eaed093f2a62e5a9477753d974524) (by [Dracrius](https://github.com/Dracrius))
-	- Hide container controls if there is only one container  
-      Final change to PR #[649](https://github.com/louislam/pull/649) as there is no need for the container controls if there is only a single container.
-   
-## 🔧 How to Install
-
-Requirements:
-- [Docker](https://docs.docker.com/engine/install/) 20+ / Podman
-- (Podman only) podman-docker (Debian: `apt install podman-docker`)
-- OS:
-  - Major Linux distros that can run Docker/Podman such as:
-     - ✅ Ubuntu
-     - ✅ Debian (Bullseye or newer)
-     - ✅ Raspbian (Bullseye or newer)
-     - ✅ CentOS
-     - ✅ Fedora
-     - ✅ ArchLinux
-  - ❌ Debian/Raspbian Buster or lower is not supported
-  - ❌ Windows (Will be supported later)
-- Arch: armv7, arm64, amd64 (a.k.a x86_64)
-
-### Basic
-
-- Default Stacks Directory: `/opt/stacks`
-- Default Port: `5001`
-
-```
-# Create directories that store your stacks and stores Dockge's stack
+```bash
+# A folder for your stacks and one for Dockge
 mkdir -p /opt/stacks /opt/dockge
 cd /opt/dockge
 
-# Download the compose.yaml
-curl https://raw.githubusercontent.com/krevoit/dockge/next-dev/compose.yaml --output compose.yaml
-
-# Start the server
+# Get the compose file and start Dockge
+curl -fsSL https://raw.githubusercontent.com/krevoit/dockge/next-dev/compose.yaml -o compose.yaml
 docker compose up -d
-
-# If you are using docker-compose V1 or Podman
-# docker-compose up -d
 ```
 
-Dockge is now running on http://localhost:5001
+Open `http://<your-server>:5001` and create your account.
 
-### Advanced
+To keep your stacks somewhere other than `/opt/stacks`, change it in all three places in `compose.yaml`: both sides of the volume and `DOCKGE_STACKS_DIR`. The path must be the same inside and outside the container, otherwise relative bind mounts in your stacks (like `./data`) point to the wrong place.
 
-If you want to store your stacks in another directory, you can generate your compose.yaml file by using the following URL with custom query strings and change the image from `louislam/dockge:1` to `krevoit/dockge` after downloading if you want to use this fork; or see and update the example docker-compose.yml file at the bottom of this page.
+### Update
 
-### Download your compose.yaml
-(in the link, change 5001 to your custom port and the /opt/stacks portion to your custom stack location)
-
-`curl "https://dockge.kuma.pet/compose.yaml?port=5001&stacksPath=/opt/stacks" --output compose.yaml`
-
-- port=`5001`
-- stacksPath=`/opt/stacks`
-
-Interactive compose.yaml generator is available on: 
-`https://dockge.kuma.pet`
-
-## How to Update
-
-```
-bash
+```bash
 cd /opt/dockge
 docker compose pull && docker compose up -d
 ```
 
-## Notifications
+### Forgot your password
 
-Settings → Notifications sends alerts to one or more channels: **Discord, Telegram, ntfy, Gotify, Microsoft Teams, Mattermost, Apprise** (which reaches 100+ other services through an [Apprise API](https://github.com/caronc/apprise-api) server) and a generic **JSON webhook**. Each channel has a test button.
+```bash
+docker exec -it dockge npm run reset-password
+```
 
-Alerts:
-- **Image updates**: after each scheduled update check, once per new image version.
-- **Crashed or out-of-memory containers**: containers you stop, restart or remove (in Dockge or with `docker`) and containers that exit with code 0 are ignored.
-- **Unhealthy containers**, and when they recover.
+## Configuration
 
-A container stuck in a restart loop sends one alert, then one summary per cooldown period (15 minutes by default) instead of an alert per crash. At most 30 notifications are sent per hour.
+Settings that apply to the whole server are environment variables in `compose.yaml`; everything else is under **Settings** in the app.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DOCKGE_STACKS_DIR` | `/opt/stacks` | Where your stacks are. Must match the stacks volume |
+| `DOCKGE_PORT` | `5001` | Port to listen on |
+| `DOCKGE_HOSTNAME` | all interfaces | Address to listen on |
+| `DOCKGE_DATA_DIR` | `./data/` | Database and settings |
+| `DOCKGE_ENABLE_CONSOLE` | `false` | `true` enables the console page: a shell in the Dockge container, which controls Docker |
+| `DOCKGE_SSL_KEY`, `DOCKGE_SSL_CERT`, `DOCKGE_SSL_KEY_PASSPHRASE` | | Serve HTTPS directly instead of behind a reverse proxy |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | | Cloudflare Turnstile CAPTCHA on the login page |
+| `OIDC_*`, `DISABLE_PASSWORD_LOGIN` | | Single sign-on, see [below](#single-sign-on-oidc) |
+| `TZ` | | Time zone for logs |
+
+**Private registries:** mount your Docker credentials, e.g. `- /root/.docker:/root/.docker:ro`, so Dockge can pull from them and check them for updates.
+
+**Reverse proxies** must pass WebSocket connections through (Dockge talks to the browser over socket.io).
 
 ## Single Sign-On (OIDC)
 
-Dockge can sign in with any OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID, …). Every successful single sign-on logs in as the Dockge user (the account created at setup, whatever its name). It is configured with environment variables:
+Dockge can sign in with any OpenID Connect provider: Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Google, Microsoft Entra ID and others. A successful sign-in logs in as the Dockge user, the account created at setup, whatever its name.
 
 | Variable | Description |
 |---|---|
 | `OIDC_ISSUER_URL` | Issuer URL, e.g. `https://auth.example.com/application/o/dockge/` (required) |
 | `OIDC_CLIENT_ID` | Client ID (required) |
-| `OIDC_CLIENT_SECRET` | Client secret. Leave empty for a public client (PKCE is always used) |
-| `OIDC_REDIRECT_URI` | Callback URL to register at the provider: `https://<your dockge>/auth/oidc/callback`. Recommended; derived from the request if not set |
+| `OIDC_CLIENT_SECRET` | Client secret. Leave it empty for a public client; PKCE is always used |
+| `OIDC_REDIRECT_URI` | The callback URL to register at the provider: `https://<your dockge>/auth/oidc/callback`. Recommended behind a reverse proxy; otherwise it's derived from the request |
 | `OIDC_PROVIDER_NAME` | Button label, "Sign in with …" (default `SSO`) |
 | `OIDC_SCOPES` | Default `openid profile email` |
 | `OIDC_TOKEN_AUTH_METHOD` | `client_secret_basic` (default) or `client_secret_post` |
-| `DISABLE_PASSWORD_LOGIN` | `true` turns off username + password login, so only single sign-on is possible |
+| `DISABLE_PASSWORD_LOGIN` | `true` turns off username and password login, so only single sign-on works |
 
-Notes:
-- **Anyone your provider lets sign in to this client gets into Dockge as that user**, which means full control over Docker on the host. Restrict the client to the right users or groups in your provider (for example an application binding in Authentik, or `authorization_policy` in Authelia).
-- `DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. It also ends sessions from earlier password logins. On a fresh install the first single sign-on creates the user (named after your SSO username), so there is no setup page.
-- A Dockge with password login disabled can't be added as a remote agent, because agents sign in with a username and password.
+- **Anyone your provider lets sign in to this client gets into Dockge**, which means control over Docker on the host. Limit the client to the right users or groups in your provider, for example with an application binding in Authentik or an `authorization_policy` in Authelia.
+- `DISABLE_PASSWORD_LOGIN` only takes effect while OIDC is configured correctly, so a typo can't lock you out. Turning it on also ends sessions from earlier password logins. On a fresh install, the first single sign-on creates the account (named after your SSO username) instead of the setup page.
+- A Dockge with password login turned off can't be added as a remote agent, because agents sign in with a username and password.
 
-## Screenshots
+## Notifications
 
-<img width="3840" height="1039" alt="image" src="https://github.com/user-attachments/assets/6712e0ff-5853-4618-8d8e-7e06fb7375f4" />
+Add one or more channels under **Settings → Notifications**. Each has a test button.
 
-<img width="2365" height="1205" alt="image" src="https://github.com/user-attachments/assets/eb4ef916-3793-4113-a8a3-7a7552e7869e" />
+| Channel | What you need |
+|---|---|
+| Discord | A channel webhook URL |
+| Telegram | A bot token (from @BotFather) and a chat ID; optionally a topic ID |
+| ntfy | Server URL and topic; an access token for protected topics |
+| Gotify | Server URL and an application token |
+| Microsoft Teams | A Workflows webhook URL ("Send webhook alerts to a channel") |
+| Mattermost | An incoming webhook URL; optionally a channel |
+| Apprise | An [Apprise API](https://github.com/caronc/apprise-api) URL, which reaches 100+ more services |
+| Webhook | Any URL; receives JSON with `event`, `severity`, `title`, `message`, `stack`, `service`, `container`, `image`, `host` and `timestamp` |
 
-<img width="3838" height="821" alt="image" src="https://github.com/user-attachments/assets/c649b376-4d2a-4913-99f7-4e7ecb655e09" />
+Alerts you can turn on:
+- **Image updates:** after each scheduled check, once per new image version.
+- **Crashed or out-of-memory containers.** Containers you stop, restart or remove (in Dockge or with `docker`) and containers that exit with code 0 don't count.
+- **Unhealthy containers**, and when they recover.
 
-<img width="3172" height="1360" alt="image" src="https://github.com/user-attachments/assets/6fd78c58-7a45-460c-8702-020083477203" />
+A container stuck in a restart loop sends one alert, then one summary per cooldown period (15 minutes by default) instead of an alert per crash. At most 30 notifications are sent per hour.
 
+## File explorer
 
+Open it with **Files** on a stack or on a running container.
 
+- **Stack folder:** the stack's folder on disk, including relative bind mounts. Symlinks pointing outside the folder are shown but can't be opened.
+- **Container:** the filesystem of a running container, including its volumes. Files are read as root inside the container, so log folders owned by other users are readable. This needs `sh` in the container; for images without a shell, use the stack folder or download the container's logs.
+- **Viewer:** opens on the end of the file, can load earlier parts, follow a growing log (it starts over if the log is rotated), filter lines and wrap long lines. Colour codes are stripped and binary files are detected.
+- **Downloads:** any file, or the logs of one container or the whole stack (`docker compose logs` with timestamps). Downloads also work through remote agents.
 
+The explorer is read-only: it doesn't upload, edit or delete files.
 
+## Remote agents
 
-## Others
+To manage stacks on other Docker hosts, install Dockge on each of them, then open **Overview → Dockge Agents → Add Agent** on the one you use. Enter the other instance's URL and its username and password. Its stacks then appear in the same list, grouped by host.
 
-Dockge is built on top of [Compose V2](https://docs.docker.com/compose/migrate/). `compose.yaml`  also known as `docker-compose.yml`.
+- Password login must stay enabled on the agents.
+- Only enable the Turnstile CAPTCHA on the instance you log in to; agents can't solve it.
 
-`compose.yaml` file above is great if cloning and building locally, otherwise, you can use this `docker-compose.yml` file to run docker command:
-`docker compose up -d` just edit the appropriate field, `[CONFIG_LOCATION_FOR_DOCKGE]` (difference from compose.yaml is it does not have the build parameter):
-```
-services:
-  dockge:
-    image: krevoit/dockge:latest
-    container_name: dockge
-    restart: unless-stopped
-    environment:
-      # Tell Dockge where your stacks directory is
-      DOCKGE_STACKS_DIR: /opt/stacks #must be the same as the source and target bind mounted volume
-      # Uncomment the following and enter valid Cloudflare Turnstile keys to activate CAPTCHA
-      # *NOTE*: Turnstile should only be enabled on the dockge instance you consider to be the
-      #         master if using remote agents, otherwise remote agents will not be able to
-      #         connect due to the CAPTCHA challenge and if you must, only expose the master
-      #         to the internet for access.
-      #- TURNSTILE_SITE_KEY=0x4AAAAAAXXXXXXXX # uncomment this line to activate
-      #- TURNSTILE_SECRET_KEY=0x4AAAAAAXXXX   # uncomment this line to activate
-      # Single sign-on, see "Single Sign-On (OIDC)" above
-      #- OIDC_ISSUER_URL=https://auth.example.com/application/o/dockge/
-      #- OIDC_CLIENT_ID=dockge
-      #- OIDC_CLIENT_SECRET=change-me
-      #- OIDC_REDIRECT_URI=https://dockge.example.com/auth/oidc/callback
-      #- OIDC_PROVIDER_NAME=Authentik
-      #- DISABLE_PASSWORD_LOGIN=true
-    ports:
-      # Host Port : Container Port
-      - 5001:5001
-    volumes:
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        bind:
-          create_host_path: true
-      - type: bind
-        source: [CONFIG_LOCATION_FOR_DOCKGE] # or wherever you keep your app data
-        target: /app/data
-        bind:
-          create_host_path: true
-      # If you want to use private registries, you need to share the auth file with Dockge:
-      # - /root/.docker/:/root/.docker
+## Security
 
-      # Stacks Directory
-      # ⚠️ READ IT CAREFULLY. If you did it wrong, your data could end up writing into a WRONG PATH.
-      # ⚠️ 1. FULL path only. No relative path (MUST)
-      # ⚠️ 2. source: and target: can be your preference but have to match, the environment variable
-      #       DOCKGE_STACKS_DIR also has to match and is what tells dockge where your stacks
-      #       directory is in the container
-      - type: bind
-        source: /opt/stacks
-        target: /opt/stacks
-        bind:
-          create_host_path: true
+Anyone who can sign in to Dockge controls Docker, which means root on the host. Keep it on a private network or behind a reverse proxy with HTTPS, and use single sign-on or the CAPTCHA if it's reachable from the internet.
+
+What Dockge does to keep that boundary tight:
+
+- **Input checks:** stack names, service names and file paths are validated before they reach the filesystem or Docker. User input goes to `docker` as separate arguments (after `--` where it could look like an option), never through a shell. Paths can't leave the stacks folder or a stack's folder, through `..` or symlinks.
+- **Logins:** login attempts are rate limited and the CAPTCHA is optional. Sessions expire after 30 days and end when the password changes. Single sign-on uses PKCE, binds each login to the browser that started it, and never puts session tokens in URLs.
+- **Browser:** a strict Content Security Policy and headers against clickjacking and MIME sniffing.
+- **Image:** built on Node.js 24 LTS and Debian 13 with only what Dockge needs: no compilers, curl or gnupg. Every build is scanned with Trivy and smoke-tested on amd64 and arm64 before `latest` moves.
+
+Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
+## Images
+
+| Tag | Architectures | |
+|---|---|---|
+| `latest` | amd64, arm64 | Current version, built from the `next-dev` branch |
+| `next-dev` | amd64, arm64 | Same as `latest` |
+| `<commit sha>` | amd64, arm64 | A specific build, to pin a version |
+
+Published as [`krevoit/dockge`](https://hub.docker.com/r/krevoit/dockge) on Docker Hub and as `ghcr.io/krevoit/dockge`. There's no 32-bit ARM image, because Node.js 24 has no official one.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE). Based on [Dockge](https://github.com/louislam/dockge) by Louis Lam.
